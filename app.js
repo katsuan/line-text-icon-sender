@@ -601,12 +601,14 @@ function renderHistoryList(items) {
           <img src="${escapeHtml(item.previewImageUrl)}" alt="保存済み画像" loading="lazy" />
         </div>
         <div class="history-meta">
-          <div class="history-sub">${escapeHtml(sub)}</div>
+          <div class="history-sub-row">
+            <div class="history-sub">${escapeHtml(sub)}</div>
+            ${item.flexLocked ? '<span class="history-lock-note">削除不可</span>' : `<button class="secondary-action history-delete-pill" type="button" data-history-delete="${index}">削除</button>`}
+          </div>
         </div>
         <div class="history-controls">
           <button class="secondary-action history-button" type="button" data-history-save="${index}">保存</button>
           <button class="secondary-action history-button" type="button" data-history-send="${index}" ${state.liffReady ? "" : "disabled"}>送信</button>
-          ${item.flexLocked ? '<span class="history-lock-note">削除不可</span>' : `<button class="secondary-action history-button history-delete-button" type="button" data-history-delete="${index}">削除</button>`}
         </div>
       </article>
     `;

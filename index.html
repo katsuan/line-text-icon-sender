@@ -33,18 +33,15 @@
           <div class="section-head-left">
             <button id="historyToggle" class="section-toggle" type="button" aria-expanded="true" aria-controls="historyBody" aria-label="History を閉じる">▼</button>
             <h2>History</h2>
+            <label class="history-toggle-pill" aria-label="履歴保存">
+              <input id="historyEnabled" type="checkbox" checked />
+              <span>履歴保存</span>
+            </label>
             <button id="refreshHistory" class="secondary-action history-action" type="button">更新</button>
           </div>
           <span id="historySummary">履歴を保存・送信できます</span>
         </div>
         <div id="historyBody" class="section-toggle-body">
-          <div class="history-settings">
-            <label class="checkline history-toggle-line">
-              <input id="historyEnabled" type="checkbox" checked />
-              <span>履歴に残す</span>
-            </label>
-            <p class="sender-help">OFF にすると新しい画像を履歴一覧へ残しません。</p>
-          </div>
           <div id="historyList" class="history-list" aria-live="polite">
             <p class="sender-help">履歴を開くと読み込みます。</p>
           </div>
@@ -275,8 +272,8 @@
 
     <dialog id="sendModeDialog" class="send-mode-dialog">
       <form method="dialog" class="send-mode-card">
-        <p class="send-mode-title">送信方法を選ぶ</p>
-        <p class="send-mode-copy">このあと送信先を選びます。まずは送信方法を選んでください。</p>
+        <p class="send-mode-title">送信方法を選択</p>
+        <p class="send-mode-copy">送信先の選択前に、送信方法を選んでください。</p>
         <div class="send-mode-notes">
           <p><strong>画像送信</strong> そのまま画像として送ります。透明背景も見え方を保ちやすいです。</p>
           <p><strong>Flex送信</strong> 画像をタップするとこのページを開けます。トーク上ではカード表示になるため、透明背景色でも白っぽい背景つきに見えることがあります。送信後は履歴に残り、削除できません。</p>
@@ -292,7 +289,7 @@
     <dialog id="deleteHistoryDialog" class="send-mode-dialog">
       <form method="dialog" class="send-mode-card">
         <p class="send-mode-title">履歴を削除する</p>
-        <p class="send-mode-copy">Google Drive 上の画像も削除します。</p>
+        <p class="send-mode-copy">履歴画像の削除を実施します。</p>
         <div class="send-mode-notes">
           <p><strong>Flex送信</strong> は、画像をタップするとこのページを開ける送信方法です。</p>
           <p>削除した画像を使った Flex送信メッセージは、あとから開けなくなったり表示が崩れたりすることがあります。</p>
