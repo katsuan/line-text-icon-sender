@@ -38,7 +38,7 @@ const els = {
   download: document.getElementById("download"),
   saveTest: document.getElementById("saveTest"),
   send: document.getElementById("send"),
-  sendFlexTest: document.getElementById("sendFlexTest"),
+  sendModeDialog: document.getElementById("sendModeDialog"),
   refreshHistory: document.getElementById("refreshHistory"),
   historyList: document.getElementById("historyList"),
   historySection: document.getElementById("historySection"),
@@ -381,10 +381,6 @@ function setSendDisabled(disabled) {
   els.send.disabled = disabled;
 }
 
-function setSendFlexTestDisabled(disabled) {
-  els.sendFlexTest.disabled = disabled;
-}
-
 function setButtonLoading(button, loading, idleLabel) {
   if (!button) return;
   button.classList.toggle("is-loading", loading);
@@ -396,10 +392,6 @@ function setButtonLoading(button, loading, idleLabel) {
 
 function setSendLoading(loading) {
   setButtonLoading(els.send, loading, "送信");
-}
-
-function setSendFlexTestLoading(loading) {
-  setButtonLoading(els.sendFlexTest, loading, "Flex送信テスト");
 }
 
 function setSaveTestDisabled(disabled) {
@@ -497,10 +489,10 @@ function applyLocalModeVisibility() {
     els.localStatusSection.setAttribute("aria-hidden", String(!showStatus));
   }
   if (els.saveTest) {
-    els.saveTest.hidden = !isLocalMode;
+    els.saveTest.hidden = !(isLocalMode && debugMode);
   }
   if (els.localCaption) {
-    els.localCaption.hidden = !isLocalMode;
+    els.localCaption.hidden = !(isLocalMode && debugMode);
   }
 }
 
@@ -646,6 +638,52 @@ function hasGasConfig() {
   return Boolean(config.gasWebAppUrl);
 }
 
+function supportsDialog() {
+  return typeof HTMLDialogElement !== "undefined" && els.sendModeDialog instanceof HTMLDialogElement;
+}
+
+function chooseSendMode() {
+  if (!supportsDialog()) {
+    const useFlex = window.confirm("Flex送信にしますか？\n「OK」でFlex送信、「キャンセル」で画像送信します。");
+    return Promise.resolve(useFlex ? "flex" : "image");
+  }
+
+  return new Promise((resolve) => {
+    const dialog = els.sendModeDialog;
+    const buttons = Array.from(dialog.querySelectorAll("[data-send-mode]"));
+
+    const cleanup = () => {
+      buttons.forEach((button) => button.removeEventListener("click", onClick));
+      dialog.removeEventListener("cancel", onCancel);
+      dialog.removeEventListener("close", onClose);
+    };
+
+    const finish = (mode) => {
+      cleanup();
+      resolve(mode);
+    };
+
+    const onClick = (event) => {
+      const target = event.currentTarget;
+      const mode = target?.dataset?.sendMode || "cancel";
+      dialog.close(mode);
+    };
+
+    const onCancel = () => {
+      dialog.close("cancel");
+    };
+
+    const onClose = () => {
+      finish(dialog.returnValue || "cancel");
+    };
+
+    buttons.forEach((button) => button.addEventListener("click", onClick));
+    dialog.addEventListener("cancel", onCancel);
+    dialog.addEventListener("close", onClose);
+    dialog.showModal();
+  });
+}
+
 function getLiffShareUrl() {
   if (typeof liff !== "undefined" && liff?.permanentLink?.createUrl) {
     try {
@@ -664,7 +702,6 @@ async function initLiff() {
   if (!config.liffId) {
     setStatus("`config.js` の `liffId` が未設定です。PNG書き出しは使えます。", "warn");
     setSendDisabled(true);
-    setSendFlexTestDisabled(true);
     setSaveTestDisabled(!hasGasConfig());
     return;
   }
@@ -672,7 +709,6 @@ async function initLiff() {
   if (location.protocol === "file:") {
     setStatus("`file://` では LIFF を初期化できません。GitHub Pages など HTTPS で開いてください。", "warn");
     setSendDisabled(true);
-    setSendFlexTestDisabled(true);
     setSaveTestDisabled(!hasGasConfig());
     return;
   }
@@ -680,7 +716,6 @@ async function initLiff() {
   if (typeof liff === "undefined") {
     setStatus("LIFF SDK の読み込みに失敗しました。", "error");
     setSendDisabled(true);
-    setSendFlexTestDisabled(true);
     setSaveTestDisabled(!hasGasConfig());
     return;
   }
@@ -703,17 +738,14 @@ async function initLiff() {
     if (config.gasWebAppUrl) {
       setStatus("LIFF の初期化が完了しました。Google Drive 保存と共有を実行できます。", "success");
       setSendDisabled(false);
-      setSendFlexTestDisabled(false);
     } else {
       setStatus("LIFF は初期化できましたが、`gasWebAppUrl` が未設定です。", "warn");
       setSendDisabled(true);
-      setSendFlexTestDisabled(true);
     }
   } catch (error) {
     state.liffError = error instanceof Error ? error.message : String(error);
     setStatus(`LIFF 初期化に失敗しました: ${state.liffError}`, "error");
     setSendDisabled(true);
-    setSendFlexTestDisabled(true);
     setSaveTestDisabled(!hasGasConfig());
   }
 }
@@ -857,31 +889,37 @@ async function sendToLine() {
 
     const exportCanvas = buildExportCanvas();
     const blob = await canvasToBlob(exportCanvas);
-    const upload = await uploadToGas(blob);
+    const uploadPromise = uploadToGas(blob);
+    const mode = await chooseSendMode();
+    if (mode === "cancel") {
+      setStatus("送信はキャンセルされました。", "warn");
+      return;
+    }
 
-    setStatus("LINE の送信先を選択してください。", "info");
-    const result = await liff.shareTargetPicker(
-      [
-        {
+    const upload = await uploadPromise;
+    const isFlex = mode === "flex";
+    const message = isFlex
+      ? buildFlexImageMessage(upload)
+      : {
           type: "image",
           originalContentUrl: upload.originalContentUrl,
           previewImageUrl: upload.previewImageUrl,
-        },
-      ],
-      {
-        isMultiple: true,
-      }
-    );
+        };
+
+    setStatus(`LINE の送信先を選択してください。${isFlex ? "Flex送信" : "画像送信"}します。`, "info");
+    const result = await liff.shareTargetPicker([message], {
+      isMultiple: true,
+    });
 
     if (result) {
-      setStatus(`送信できました。${upload.folderName} に${upload.reused ? "再利用" : "保存"}済みです。`, "success");
+      setStatus(`${isFlex ? "Flex送信" : "画像送信"}できました。${upload.folderName} に${upload.reused ? "再利用" : "保存"}済みです。`, "success");
     } else {
-      setStatus(`送信はキャンセルされました。画像は ${upload.folderName} に${upload.reused ? "再利用" : "保存"}されています。`, "warn");
+      setStatus(`${isFlex ? "Flex送信" : "画像送信"}はキャンセルされました。画像は ${upload.folderName} に${upload.reused ? "再利用" : "保存"}されています。`, "warn");
     }
     refreshHistorySilently();
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    setStatus(`送信処理に失敗しました: ${message}`, "error");
+    setStatus(`送信に失敗しました: ${message}`, "error");
   } finally {
     setSendLoading(false);
     setSendDisabled(!state.liffReady || !config.gasWebAppUrl);
@@ -892,7 +930,7 @@ function buildFlexImageMessage(upload) {
   const flexImageUrl = upload.previewImageUrl || upload.originalContentUrl;
   return {
     type: "flex",
-    altText: `${els.text.value || "画像"} を送信`,
+    altText: `${els.text.value || "画像"} をFlex送信`,
     contents: {
       type: "bubble",
       size: "giga",
@@ -929,48 +967,6 @@ function buildFlexImageMessage(upload) {
   };
 }
 
-async function sendFlexTestToLine() {
-  if (!hasSenderConfig()) {
-    setStatus("`config.js` の `liffId` または `gasWebAppUrl` が未設定です。", "warn");
-    return;
-  }
-  if (!state.liffReady) {
-    setStatus("LIFF の初期化完了後に再度お試しください。", "warn");
-    return;
-  }
-
-  try {
-    setSendDisabled(true);
-    setSendFlexTestDisabled(true);
-    setSendFlexTestLoading(true);
-    setStatus("Google Drive へ保存して Flex 送信を準備しています。", "info");
-
-    const exportCanvas = buildExportCanvas();
-    const blob = await canvasToBlob(exportCanvas);
-    const upload = await uploadToGas(blob);
-    const message = buildFlexImageMessage(upload);
-
-    setStatus("LINE の送信先を選択してください。Flex で実機確認します。", "info");
-    const result = await liff.shareTargetPicker([message], {
-      isMultiple: true,
-    });
-
-    if (result) {
-      setStatus(`Flex送信できました。${upload.folderName} に${upload.reused ? "再利用" : "保存"}済みです。`, "success");
-    } else {
-      setStatus(`Flex送信はキャンセルされました。画像は ${upload.folderName} に${upload.reused ? "再利用" : "保存"}されています。`, "warn");
-    }
-    refreshHistorySilently();
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    setStatus(`Flex送信テストに失敗しました: ${message}`, "error");
-  } finally {
-    setSendFlexTestLoading(false);
-    setSendDisabled(!state.liffReady || !config.gasWebAppUrl);
-    setSendFlexTestDisabled(!state.liffReady || !config.gasWebAppUrl);
-  }
-}
-
 async function sendHistoryItem(item) {
   if (!state.liffReady) {
     setStatus("LIFF の初期化完了後に再度お試しください。", "warn");
@@ -978,25 +974,30 @@ async function sendHistoryItem(item) {
   }
 
   try {
-    setSendDisabled(true);
-    setStatus("履歴画像の送信先を選択してください。", "info");
-    const result = await liff.shareTargetPicker(
-      [
-        {
+    const mode = await chooseSendMode();
+    if (mode === "cancel") {
+      setStatus("送信はキャンセルされました。", "warn");
+      return;
+    }
+    const isFlex = mode === "flex";
+    const message = isFlex
+      ? buildFlexImageMessage(item)
+      : {
           type: "image",
           originalContentUrl: item.originalContentUrl,
           previewImageUrl: item.previewImageUrl,
-        },
-      ],
-      {
-        isMultiple: true,
-      }
-    );
+        };
+
+    setSendDisabled(true);
+    setStatus(`履歴画像の送信先を選択してください。${isFlex ? "Flex送信" : "画像送信"}します。`, "info");
+    const result = await liff.shareTargetPicker([message], {
+      isMultiple: true,
+    });
 
     if (result) {
-      setStatus("履歴画像を送信できました。", "success");
+      setStatus(`履歴画像を${isFlex ? "Flex送信" : "画像送信"}できました。`, "success");
     } else {
-      setStatus("履歴画像の送信はキャンセルされました。", "warn");
+      setStatus(`履歴画像の${isFlex ? "Flex送信" : "画像送信"}はキャンセルされました。`, "warn");
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -1043,7 +1044,7 @@ Object.values(els).forEach((el) => {
         });
     }
     syncOutputs();
-    if (el === els.download || el === els.saveTest || el === els.send || el === els.sendFlexTest) return;
+    if (el === els.download || el === els.saveTest || el === els.send) return;
     generate();
   });
 });
@@ -1110,7 +1111,6 @@ presetButtons.forEach((button) => {
 els.download.addEventListener("click", download);
 els.saveTest.addEventListener("click", saveToDriveTest);
 els.send.addEventListener("click", sendToLine);
-els.sendFlexTest.addEventListener("click", sendFlexTestToLine);
 els.historyToggle.addEventListener("click", () => {
   setSectionCollapsed("history", !state.sections.historyCollapsed);
 });
@@ -1137,7 +1137,6 @@ generate();
 applyLocalModeVisibility();
 initializeSectionState();
 setSendDisabled(true);
-setSendFlexTestDisabled(true);
 setSaveTestDisabled(!hasGasConfig());
 els.refreshHistory.disabled = !hasGasConfig();
 setStatus("`config.js` を確認しながら初期化しています。", "info");

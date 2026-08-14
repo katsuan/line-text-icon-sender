@@ -908,8 +908,7 @@ canvas {
 }
 
 .sender-actions-bar #download,
-.sender-actions-bar #send,
-.sender-actions-bar #sendFlexTest {
+.sender-actions-bar #send {
   grid-row: 1;
 }
 
@@ -940,7 +939,6 @@ canvas {
 }
 
 .sender-actions-bar #send,
-.sender-actions-bar #sendFlexTest,
 .history-button[data-history-send],
 .history-controls [data-history-send] {
   background: var(--accent);
@@ -952,8 +950,7 @@ canvas {
   color: var(--accent-strong);
 }
 
-.sender-actions-bar #send.is-loading,
-.sender-actions-bar #sendFlexTest.is-loading {
+.sender-actions-bar #send.is-loading {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -981,6 +978,61 @@ canvas {
   font-size: 0.92rem;
   line-height: 1.5;
   margin: 0;
+}
+
+.send-mode-dialog {
+  width: min(420px, calc(100vw - 32px));
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.send-mode-dialog::backdrop {
+  background: rgba(20, 20, 20, 0.42);
+  backdrop-filter: blur(3px);
+}
+
+.send-mode-card {
+  display: grid;
+  gap: 14px;
+  padding: 22px;
+  border: 2px solid var(--line);
+  border-radius: 24px;
+  background: var(--panel);
+  box-shadow: var(--shadow-strong);
+}
+
+.send-mode-title {
+  font-size: 1.1rem;
+  font-weight: 800;
+}
+
+.send-mode-copy {
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.6;
+}
+
+.send-mode-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.send-mode-button {
+  width: 100%;
+}
+
+.send-mode-actions .send-mode-button:last-child {
+  background: var(--accent);
+  color: #fff;
+}
+
+.send-mode-cancel {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  padding: 0;
 }
 
 .sender-help {
@@ -1666,7 +1718,7 @@ canvas {
   }
 
   .sender-actions-bar {
-    grid-template-columns: auto auto auto 1fr;
+    grid-template-columns: auto auto 1fr;
     align-items: center;
     bottom: 16px;
   }

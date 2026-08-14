@@ -259,12 +259,24 @@
 
       <section class="sender-actions-bar panel">
         <button id="download" class="primary-action" type="button">保存</button>
-        <button id="saveTest" class="secondary-action" type="button">Drive保存をテスト</button>
         <button id="send" class="secondary-action" type="button">送信</button>
-        <button id="sendFlexTest" class="secondary-action" type="button">Flex送信テスト</button>
-        <p id="localCaption" class="sender-caption">`Drive保存をテスト` は `GAS Web App URL` だけで確認できます。`送信` と `Flex送信テスト` は `LIFF ID` も必要です。</p>
+        <button id="saveTest" class="secondary-action" type="button" hidden>Drive保存をテスト</button>
+        <p class="sender-caption">送信時に、画像送信か Flex送信かを選べます。</p>
+        <p id="localCaption" class="sender-caption">`Drive保存をテスト` は `GAS Web App URL` だけで確認できます。`画像送信` と `Flex送信` は `LIFF ID` も必要です。</p>
       </section>
     </main>
+
+    <dialog id="sendModeDialog" class="send-mode-dialog">
+      <form method="dialog" class="send-mode-card">
+        <p class="send-mode-title">送信方法を選ぶ</p>
+        <p class="send-mode-copy">画像送信はそのまま送り、Flex送信は画像タップでこのページを開けます。</p>
+        <div class="send-mode-actions">
+          <button class="secondary-action send-mode-button" type="button" value="image" data-send-mode="image">画像送信</button>
+          <button class="secondary-action send-mode-button" type="button" value="flex" data-send-mode="flex">Flex送信</button>
+        </div>
+        <button class="send-mode-cancel" type="button" value="cancel" data-send-mode="cancel">キャンセル</button>
+      </form>
+    </dialog>
 
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="./config.js"></script>
