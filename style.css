@@ -741,6 +741,10 @@ button:focus-visible,
   display: none;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 canvas {
   width: 220px;
   height: 220px;
@@ -1104,6 +1108,8 @@ canvas {
   border-radius: 18px;
   line-height: 1.6;
   background: #fff;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .status-box.is-info {

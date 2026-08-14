@@ -13,6 +13,7 @@ const mobileDarkCtx = previewMobileDark.getContext("2d");
 
 const config = window.TEXT_ICON_SENDER_CONFIG || {};
 const isLocalMode = location.protocol === "file:";
+const debugMode = new URLSearchParams(location.search).get("debug") === "1";
 const STORAGE_KEYS = {
   historyCollapsed: "texticon_sender_history_collapsed",
   styleCollapsed: "texticon_sender_style_collapsed",
@@ -477,7 +478,9 @@ function initializeSectionState() {
 
 function applyLocalModeVisibility() {
   if (els.localStatusSection) {
-    els.localStatusSection.hidden = !isLocalMode;
+    const showStatus = debugMode;
+    els.localStatusSection.hidden = !showStatus;
+    els.localStatusSection.setAttribute("aria-hidden", String(!showStatus));
   }
   if (els.saveTest) {
     els.saveTest.hidden = !isLocalMode;
