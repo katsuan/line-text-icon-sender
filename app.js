@@ -428,7 +428,7 @@ function saveStoredBoolean(key, value) {
 function updateToggleButton(button, collapsed) {
   if (!button) return;
   const sectionName = button === els.historyToggle ? "History" : "Style";
-  button.textContent = collapsed ? "▶" : "▼";
+  button.textContent = collapsed ? "▸" : "▾";
   button.setAttribute("aria-expanded", String(!collapsed));
   button.setAttribute("aria-label", collapsed ? `${sectionName} を開く` : `${sectionName} を閉じる`);
   button.classList.toggle("is-collapsed", collapsed);

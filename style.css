@@ -1520,6 +1520,10 @@ canvas {
 }
 
 @media (max-width: 640px) {
+  .sender-hero h1 {
+    font-size: clamp(1.68rem, 8vw, 2.1rem);
+  }
+
   .sender-section h2,
   .sender-actions-bar h2,
   #localStatusSection h2 {
