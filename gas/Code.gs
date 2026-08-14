@@ -1,5 +1,6 @@
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 const DRIVE_FOLDER_ID_KEY = 'DRIVE_FOLDER_ID';
+const FLEX_HISTORY_FOLDER_NAME = '_flex_sent';
 
 function doGet(e) {
   try {
@@ -47,6 +48,51 @@ function doPost(e) {
     const imageBase64 = payload.imageBase64 || '';
     const userKey = sanitizeDriveName_(payload.userKey || 'local_debug');
     const assetKey = String(payload.assetKey || fileName);
+    const keepHistory = payload.keepHistory !== false;
+
+    if (payload.action === 'delete') {
+      const rootFolder = DriveApp.getFolderById(driveFolderId);
+      const userFolder = getOrCreateChildFolder_(rootFolder, userKey);
+      const file = findFileByIdRecursive_(userFolder, String(payload.fileId || ''));
+      if (!file) {
+        throw new Error('削除対象の画像が見つかりません。');
+      }
+      const metadata = parseMetadata_(file.getDescription());
+      if (metadata.flexLocked === true) {
+        throw new Error('Flex送信済みの画像は削除できません。');
+      }
+      file.setTrashed(true);
+      return jsonResponse({
+        ok: true,
+        action: 'delete',
+        fileId: file.getId(),
+        userKey: userKey,
+      });
+    }
+
+    if (payload.action === 'markFlex') {
+      const rootFolder = DriveApp.getFolderById(driveFolderId);
+      const userFolder = getOrCreateChildFolder_(rootFolder, userKey);
+      const file = findFileByIdRecursive_(userFolder, String(payload.fileId || ''));
+      if (!file) {
+        throw new Error('Flex送信用の画像が見つかりません。');
+      }
+      const metadata = parseMetadata_(file.getDescription());
+      metadata.keepHistory = true;
+      metadata.flexLocked = true;
+      metadata.sentMode = 'flex';
+      metadata.flexSentAt = new Date().toISOString();
+      updateFileMetadata_(file, metadata);
+      const flexFolder = getOrCreateChildFolder_(userFolder, FLEX_HISTORY_FOLDER_NAME);
+      file.moveTo(flexFolder);
+      return jsonResponse({
+        ok: true,
+        action: 'markFlex',
+        fileId: file.getId(),
+        folderName: flexFolder.getName(),
+        userKey: userKey,
+      });
+    }
 
     if (!imageBase64) {
       throw new Error('imageBase64 がありません。');
@@ -56,7 +102,13 @@ function doPost(e) {
     const userFolder = getOrCreateChildFolder_(rootFolder, userKey);
     const storedFileName = buildStoredFileName_(assetKey, mimeType);
     const existingFile = findFileByName_(userFolder, storedFileName);
-    const file = existingFile || createDriveFile_(userFolder, imageBase64, mimeType, storedFileName, fileName, payload);
+    const file = existingFile || createDriveFile_(userFolder, imageBase64, mimeType, storedFileName);
+    updateFileMetadata_(file, {
+      sourceFileName: fileName,
+      text: payload.text || '',
+      savedAt: new Date().toISOString(),
+      keepHistory: keepHistory,
+    });
     file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
 
     const fileId = file.getId();
@@ -85,20 +137,14 @@ function doPost(e) {
   }
 }
 
-function createDriveFile_(folder, imageBase64, mimeType, storedFileName, originalFileName, payload) {
+function createDriveFile_(folder, imageBase64, mimeType, storedFileName) {
   const bytes = Utilities.base64Decode(imageBase64);
   if (bytes.length > MAX_FILE_SIZE_BYTES) {
     throw new Error('ファイルサイズが大きすぎます。');
   }
 
   const blob = Utilities.newBlob(bytes, mimeType, storedFileName);
-  const file = folder.createFile(blob);
-  file.setDescription(JSON.stringify({
-    sourceFileName: originalFileName,
-    text: payload.text || '',
-    savedAt: new Date().toISOString(),
-  }));
-  return file;
+  return folder.createFile(blob);
 }
 
 function getOrCreateChildFolder_(parentFolder, folderName) {
@@ -114,6 +160,27 @@ function findFileByName_(folder, fileName) {
   return files.hasNext() ? files.next() : null;
 }
 
+function findFileByIdRecursive_(folder, fileId) {
+  if (!fileId) {
+    return null;
+  }
+  const files = folder.getFiles();
+  while (files.hasNext()) {
+    const file = files.next();
+    if (file.getId() === fileId) {
+      return file;
+    }
+  }
+  const folders = folder.getFolders();
+  while (folders.hasNext()) {
+    const found = findFileByIdRecursive_(folders.next(), fileId);
+    if (found) {
+      return found;
+    }
+  }
+  return null;
+}
+
 function buildStoredFileName_(assetKey, mimeType) {
   const digest = Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, assetKey, Utilities.Charset.UTF_8);
   const hex = digest.map(function(byte) {
@@ -125,11 +192,23 @@ function buildStoredFileName_(assetKey, mimeType) {
 }
 
 function listHistory_(folder, limit) {
-  const files = folder.getFiles();
   const items = [];
+  collectHistoryItems_(folder, items);
+
+  items.sort(function(a, b) {
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
+  return items.slice(0, limit);
+}
+
+function collectHistoryItems_(folder, items) {
+  const files = folder.getFiles();
   while (files.hasNext()) {
     const file = files.next();
     const metadata = parseMetadata_(file.getDescription());
+    if (metadata.keepHistory === false) {
+      continue;
+    }
     items.push({
       fileId: file.getId(),
       fileName: file.getName(),
@@ -140,13 +219,15 @@ function listHistory_(folder, limit) {
       webViewLink: file.getUrl(),
       createdAt: file.getDateCreated().toISOString(),
       text: metadata.text || '',
+      flexLocked: metadata.flexLocked === true,
+      sentMode: metadata.sentMode || '',
     });
   }
 
-  items.sort(function(a, b) {
-    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-  });
-  return items.slice(0, limit);
+  const folders = folder.getFolders();
+  while (folders.hasNext()) {
+    collectHistoryItems_(folders.next(), items);
+  }
 }
 
 function parseMetadata_(description) {
@@ -158,6 +239,10 @@ function parseMetadata_(description) {
   } catch (error) {
     return {};
   }
+}
+
+function updateFileMetadata_(file, metadata) {
+  file.setDescription(JSON.stringify(metadata));
 }
 
 function getRequestParameters_(e) {

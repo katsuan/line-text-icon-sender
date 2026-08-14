@@ -17,6 +17,7 @@ const debugMode = new URLSearchParams(location.search).get("debug") === "1";
 const STORAGE_KEYS = {
   historyCollapsed: "texticon_sender_history_collapsed",
   styleCollapsed: "texticon_sender_style_collapsed",
+  historyEnabled: "texticon_sender_history_enabled",
 };
 
 const els = {
@@ -39,7 +40,9 @@ const els = {
   saveTest: document.getElementById("saveTest"),
   send: document.getElementById("send"),
   sendModeDialog: document.getElementById("sendModeDialog"),
+  deleteHistoryDialog: document.getElementById("deleteHistoryDialog"),
   refreshHistory: document.getElementById("refreshHistory"),
+  historyEnabled: document.getElementById("historyEnabled"),
   historyList: document.getElementById("historyList"),
   historySection: document.getElementById("historySection"),
   historyBody: document.getElementById("historyBody"),
@@ -73,6 +76,7 @@ const state = {
   historyItems: [],
   historyLoaded: false,
   historyDirty: true,
+  historyEnabled: true,
   sections: {
     historyCollapsed: false,
     styleCollapsed: false,
@@ -398,6 +402,29 @@ function setSaveTestDisabled(disabled) {
   els.saveTest.disabled = disabled;
 }
 
+function setHistoryEnabled(enabled, options = {}) {
+  const { persist = true } = options;
+  state.historyEnabled = enabled;
+  if (els.historyEnabled) {
+    els.historyEnabled.checked = enabled;
+  }
+  if (persist) {
+    saveStoredBoolean(STORAGE_KEYS.historyEnabled, enabled);
+  }
+  if (!enabled) {
+    state.historyLoaded = false;
+    state.historyDirty = false;
+    els.refreshHistory.disabled = true;
+    renderHistoryDisabled();
+    return;
+  }
+  els.refreshHistory.disabled = !hasGasConfig();
+  state.historyDirty = true;
+  if (!state.sections.historyCollapsed) {
+    void ensureHistoryLoadedIfNeeded(true);
+  }
+}
+
 function loadStoredBoolean(key, fallback = false) {
   try {
     const value = window.localStorage.getItem(key);
@@ -427,7 +454,7 @@ function updateToggleButton(button, collapsed) {
 }
 
 async function ensureHistoryLoadedIfNeeded(force = false) {
-  if (!hasGasConfig() || state.sections.historyCollapsed) return;
+  if (!hasGasConfig() || state.sections.historyCollapsed || !state.historyEnabled) return;
   if (!force && state.historyLoaded && !state.historyDirty) return;
   renderHistoryLoading();
   await refreshHistory();
@@ -478,8 +505,10 @@ function setSectionCollapsed(name, collapsed, options = {}) {
 function initializeSectionState() {
   state.sections.historyCollapsed = loadStoredBoolean(STORAGE_KEYS.historyCollapsed, true);
   state.sections.styleCollapsed = loadStoredBoolean(STORAGE_KEYS.styleCollapsed, false);
+  state.historyEnabled = loadStoredBoolean(STORAGE_KEYS.historyEnabled, true);
   setSectionCollapsed("history", state.sections.historyCollapsed, { persist: false, skipLoad: true });
   setSectionCollapsed("style", state.sections.styleCollapsed, { persist: false });
+  setHistoryEnabled(state.historyEnabled, { persist: false });
 }
 
 function applyLocalModeVisibility() {
@@ -550,6 +579,10 @@ function renderHistoryLoading() {
   els.historyList.innerHTML = '<p class="sender-help loading-note">履歴を読み込んでいます。</p>';
 }
 
+function renderHistoryDisabled() {
+  els.historyList.innerHTML = '<p class="sender-help">履歴保存はオフです。新しい画像は一覧に残しません。</p>';
+}
+
 function renderHistoryList(items) {
   state.historyItems = items;
   if (!items.length) {
@@ -558,7 +591,10 @@ function renderHistoryList(items) {
   }
 
   els.historyList.innerHTML = items.map((item, index) => {
-    const sub = [formatHistoryDate(item.createdAt)].filter(Boolean).join(" / ");
+    const sub = [
+      formatHistoryDate(item.createdAt),
+      item.flexLocked ? "Flex送信済み" : "",
+    ].filter(Boolean).join(" / ");
     return `
       <article class="history-item">
         <div class="history-thumb">
@@ -570,6 +606,7 @@ function renderHistoryList(items) {
         <div class="history-controls">
           <button class="secondary-action history-button" type="button" data-history-save="${index}">保存</button>
           <button class="secondary-action history-button" type="button" data-history-send="${index}" ${state.liffReady ? "" : "disabled"}>送信</button>
+          ${item.flexLocked ? '<span class="history-lock-note">削除不可</span>' : `<button class="secondary-action history-button history-delete-button" type="button" data-history-delete="${index}">削除</button>`}
         </div>
       </article>
     `;
@@ -598,6 +635,28 @@ function renderHistoryList(items) {
       const item = state.historyItems[index];
       if (!item) return;
       void sendHistoryItem(item);
+    });
+  });
+
+  els.historyList.querySelectorAll("[data-history-delete]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const index = Number(button.dataset.historyDelete);
+      const item = state.historyItems[index];
+      if (!item) return;
+      const confirmed = await confirmDeleteHistoryItem();
+      if (!confirmed) return;
+      button.disabled = true;
+      try {
+        await deleteHistoryItem(item);
+        state.historyItems = state.historyItems.filter((entry) => entry.fileId !== item.fileId);
+        renderHistoryList(state.historyItems);
+        setStatus("履歴画像を削除しました。", "success");
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        setStatus(`履歴画像の削除に失敗しました: ${message}`, "error");
+      } finally {
+        button.disabled = false;
+      }
     });
   });
 }
@@ -675,6 +734,46 @@ function chooseSendMode() {
 
     const onClose = () => {
       finish(dialog.returnValue || "cancel");
+    };
+
+    buttons.forEach((button) => button.addEventListener("click", onClick));
+    dialog.addEventListener("cancel", onCancel);
+    dialog.addEventListener("close", onClose);
+    dialog.showModal();
+  });
+}
+
+function confirmDeleteHistoryItem() {
+  if (!(typeof HTMLDialogElement !== "undefined" && els.deleteHistoryDialog instanceof HTMLDialogElement)) {
+    return Promise.resolve(window.confirm("履歴画像を削除しますか？\nFlex送信は画像タップでこのページを開ける送信方法です。削除すると、送信済みのFlexメッセージが無効になることがあります。"));
+  }
+
+  return new Promise((resolve) => {
+    const dialog = els.deleteHistoryDialog;
+    const buttons = Array.from(dialog.querySelectorAll("[data-delete-confirm]"));
+
+    const cleanup = () => {
+      buttons.forEach((button) => button.removeEventListener("click", onClick));
+      dialog.removeEventListener("cancel", onCancel);
+      dialog.removeEventListener("close", onClose);
+    };
+
+    const finish = (confirmed) => {
+      cleanup();
+      resolve(confirmed);
+    };
+
+    const onClick = (event) => {
+      const target = event.currentTarget;
+      dialog.close(target?.dataset?.deleteConfirm || "cancel");
+    };
+
+    const onCancel = () => {
+      dialog.close("cancel");
+    };
+
+    const onClose = () => {
+      finish(dialog.returnValue === "delete");
     };
 
     buttons.forEach((button) => button.addEventListener("click", onClick));
@@ -780,6 +879,10 @@ function blobToBase64(blob) {
 }
 
 async function uploadToGas(blob) {
+  return uploadToGasWithOptions(blob);
+}
+
+async function uploadToGasWithOptions(blob, options = {}) {
   const safe = (els.text.value || "texticon").replace(/[^\p{L}\p{N}_-]+/gu, "_");
   const payload = {
     fileName: `${safe || "texticon_sender"}.png`,
@@ -788,6 +891,7 @@ async function uploadToGas(blob) {
     text: els.text.value || "",
     userKey: getEffectiveUserKey(),
     assetKey: buildAssetKey(),
+    keepHistory: options.keepHistory ?? state.historyEnabled,
     imageBase64: await blobToBase64(blob),
   };
 
@@ -811,7 +915,64 @@ async function uploadToGas(blob) {
   return data;
 }
 
+async function markFlexHistoryItem(fileId) {
+  const response = await fetch(config.gasWebAppUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "text/plain;charset=utf-8",
+    },
+    body: JSON.stringify({
+      action: "markFlex",
+      userKey: getEffectiveUserKey(),
+      fileId: fileId,
+    }),
+    redirect: "follow",
+  });
+
+  if (!response.ok) {
+    throw new Error(`Flex履歴の更新に失敗しました (${response.status})`);
+  }
+
+  const data = await response.json();
+  if (!data.ok) {
+    throw new Error(data.error || "GAS が Flex履歴更新エラーを返しました。");
+  }
+  return data;
+}
+
+async function deleteHistoryItem(item) {
+  if (!hasGasConfig()) {
+    throw new Error("`config.js` の `gasWebAppUrl` が未設定です。");
+  }
+
+  const response = await fetch(config.gasWebAppUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "text/plain;charset=utf-8",
+    },
+    body: JSON.stringify({
+      action: "delete",
+      userKey: getEffectiveUserKey(),
+      fileId: item.fileId,
+    }),
+    redirect: "follow",
+  });
+
+  if (!response.ok) {
+    throw new Error(`削除に失敗しました (${response.status})`);
+  }
+
+  const data = await response.json();
+  if (!data.ok) {
+    throw new Error(data.error || "GAS が削除エラーを返しました。");
+  }
+  return data;
+}
+
 async function fetchHistory() {
+  if (!state.historyEnabled) {
+    return [];
+  }
   if (!hasGasConfig()) {
     throw new Error("`config.js` の `gasWebAppUrl` が未設定です。");
   }
@@ -838,6 +999,10 @@ async function fetchHistory() {
 }
 
 async function refreshHistory() {
+  if (!state.historyEnabled) {
+    renderHistoryDisabled();
+    return;
+  }
   if (!hasGasConfig()) {
     setStatus("`config.js` の `gasWebAppUrl` が未設定です。", "warn");
     return;
@@ -860,7 +1025,7 @@ async function refreshHistory() {
 }
 
 function refreshHistorySilently() {
-  if (!hasGasConfig()) return;
+  if (!hasGasConfig() || !state.historyEnabled) return;
   state.historyDirty = true;
   if (state.sections.historyCollapsed) return;
   void fetchHistory()
@@ -885,19 +1050,20 @@ async function sendToLine() {
   try {
     setSendDisabled(true);
     setSendLoading(true);
-    setStatus("Google Drive へ保存しています。", "info");
-
-    const exportCanvas = buildExportCanvas();
-    const blob = await canvasToBlob(exportCanvas);
-    const uploadPromise = uploadToGas(blob);
     const mode = await chooseSendMode();
     if (mode === "cancel") {
       setStatus("送信はキャンセルされました。", "warn");
       return;
     }
 
-    const upload = await uploadPromise;
     const isFlex = mode === "flex";
+    setStatus(`Google Drive へ保存しています。${isFlex ? "Flex送信した画像は履歴に残り、あとから削除できません。" : ""}`, "info");
+
+    const exportCanvas = buildExportCanvas();
+    const blob = await canvasToBlob(exportCanvas);
+    const upload = await uploadToGasWithOptions(blob, {
+      keepHistory: isFlex ? true : state.historyEnabled,
+    });
     const message = isFlex
       ? buildFlexImageMessage(upload)
       : {
@@ -912,11 +1078,16 @@ async function sendToLine() {
     });
 
     if (result) {
+      if (isFlex) {
+        await markFlexHistoryItem(upload.fileId);
+      }
       setStatus(`${isFlex ? "Flex送信" : "画像送信"}できました。${upload.folderName} に${upload.reused ? "再利用" : "保存"}済みです。`, "success");
     } else {
       setStatus(`${isFlex ? "Flex送信" : "画像送信"}はキャンセルされました。画像は ${upload.folderName} に${upload.reused ? "再利用" : "保存"}されています。`, "warn");
     }
-    refreshHistorySilently();
+    if (state.historyEnabled) {
+      refreshHistorySilently();
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     setStatus(`送信に失敗しました: ${message}`, "error");
@@ -995,6 +1166,9 @@ async function sendHistoryItem(item) {
     });
 
     if (result) {
+      if (isFlex && !item.flexLocked) {
+        await markFlexHistoryItem(item.fileId);
+      }
       setStatus(`履歴画像を${isFlex ? "Flex送信" : "画像送信"}できました。`, "success");
     } else {
       setStatus(`履歴画像の${isFlex ? "Flex送信" : "画像送信"}はキャンセルされました。`, "warn");
@@ -1121,6 +1295,9 @@ els.refreshHistory.addEventListener("click", () => {
   renderHistoryLoading();
   void refreshHistory();
 });
+els.historyEnabled.addEventListener("change", () => {
+  setHistoryEnabled(els.historyEnabled.checked);
+});
 
 syncOutputs();
 [
@@ -1138,7 +1315,7 @@ applyLocalModeVisibility();
 initializeSectionState();
 setSendDisabled(true);
 setSaveTestDisabled(!hasGasConfig());
-els.refreshHistory.disabled = !hasGasConfig();
+els.refreshHistory.disabled = !hasGasConfig() || !state.historyEnabled;
 setStatus("`config.js` を確認しながら初期化しています。", "info");
 activateStyleTab("color");
 activatePreviewTab("transparent");

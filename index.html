@@ -38,6 +38,13 @@
           <span id="historySummary">履歴を保存・送信できます</span>
         </div>
         <div id="historyBody" class="section-toggle-body">
+          <div class="history-settings">
+            <label class="checkline history-toggle-line">
+              <input id="historyEnabled" type="checkbox" checked />
+              <span>履歴に残す</span>
+            </label>
+            <p class="sender-help">OFF にすると新しい画像を履歴一覧へ残しません。</p>
+          </div>
           <div id="historyList" class="history-list" aria-live="polite">
             <p class="sender-help">履歴を開くと読み込みます。</p>
           </div>
@@ -261,7 +268,7 @@
         <button id="download" class="primary-action" type="button">保存</button>
         <button id="send" class="secondary-action" type="button">送信</button>
         <button id="saveTest" class="secondary-action" type="button" hidden>Drive保存をテスト</button>
-        <p class="sender-caption">送信時に、画像送信か Flex送信かを選べます。</p>
+        <p class="sender-caption">送信方法を選んだあとに、送信先を選べます。</p>
         <p id="localCaption" class="sender-caption">`Drive保存をテスト` は `GAS Web App URL` だけで確認できます。`画像送信` と `Flex送信` は `LIFF ID` も必要です。</p>
       </section>
     </main>
@@ -269,12 +276,31 @@
     <dialog id="sendModeDialog" class="send-mode-dialog">
       <form method="dialog" class="send-mode-card">
         <p class="send-mode-title">送信方法を選ぶ</p>
-        <p class="send-mode-copy">画像送信はそのまま送り、Flex送信は画像タップでこのページを開けます。</p>
+        <p class="send-mode-copy">このあと送信先を選びます。まずは送信方法を選んでください。</p>
+        <div class="send-mode-notes">
+          <p><strong>画像送信</strong> そのまま画像として送ります。透明背景も見え方を保ちやすいです。</p>
+          <p><strong>Flex送信</strong> 画像をタップするとこのページを開けます。トーク上ではカード表示になるため、透明背景色でも白っぽい背景つきに見えることがあります。送信後は履歴に残り、削除できません。</p>
+        </div>
         <div class="send-mode-actions">
           <button class="secondary-action send-mode-button" type="button" value="image" data-send-mode="image">画像送信</button>
           <button class="secondary-action send-mode-button" type="button" value="flex" data-send-mode="flex">Flex送信</button>
         </div>
         <button class="send-mode-cancel" type="button" value="cancel" data-send-mode="cancel">キャンセル</button>
+      </form>
+    </dialog>
+
+    <dialog id="deleteHistoryDialog" class="send-mode-dialog">
+      <form method="dialog" class="send-mode-card">
+        <p class="send-mode-title">履歴を削除する</p>
+        <p class="send-mode-copy">Google Drive 上の画像も削除します。</p>
+        <div class="send-mode-notes">
+          <p><strong>Flex送信</strong> は、画像をタップするとこのページを開ける送信方法です。</p>
+          <p>削除した画像を使った Flex送信メッセージは、あとから開けなくなったり表示が崩れたりすることがあります。</p>
+        </div>
+        <div class="send-mode-actions">
+          <button class="secondary-action send-mode-button send-mode-danger" type="button" value="delete" data-delete-confirm="delete">削除する</button>
+        </div>
+        <button class="send-mode-cancel" type="button" value="cancel" data-delete-confirm="cancel">キャンセル</button>
       </form>
     </dialog>
 
