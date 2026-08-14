@@ -1103,7 +1103,7 @@ function buildFlexImageMessage(upload) {
   const flexImageUrl = upload.previewImageUrl || upload.originalContentUrl;
   return {
     type: "flex",
-    altText: `${els.text.value || "画像"} をFlex送信`,
+    altText: `${els.text.value || "画像"} - 💬TextIconSender`,
     contents: {
       type: "bubble",
       size: "giga",
