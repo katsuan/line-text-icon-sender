@@ -38,6 +38,7 @@ const els = {
   download: document.getElementById("download"),
   saveTest: document.getElementById("saveTest"),
   send: document.getElementById("send"),
+  sendFlexTest: document.getElementById("sendFlexTest"),
   refreshHistory: document.getElementById("refreshHistory"),
   historyList: document.getElementById("historyList"),
   historySection: document.getElementById("historySection"),
@@ -380,12 +381,25 @@ function setSendDisabled(disabled) {
   els.send.disabled = disabled;
 }
 
-function setSendLoading(loading) {
-  els.send.classList.toggle("is-loading", loading);
-  els.send.setAttribute("aria-busy", String(loading));
-  els.send.innerHTML = loading
+function setSendFlexTestDisabled(disabled) {
+  els.sendFlexTest.disabled = disabled;
+}
+
+function setButtonLoading(button, loading, idleLabel) {
+  if (!button) return;
+  button.classList.toggle("is-loading", loading);
+  button.setAttribute("aria-busy", String(loading));
+  button.innerHTML = loading
     ? '<span class="button-spinner" aria-hidden="true"></span><span>準備中...</span>'
-    : "送信";
+    : idleLabel;
+}
+
+function setSendLoading(loading) {
+  setButtonLoading(els.send, loading, "送信");
+}
+
+function setSendFlexTestLoading(loading) {
+  setButtonLoading(els.sendFlexTest, loading, "Flex送信テスト");
 }
 
 function setSaveTestDisabled(disabled) {
@@ -632,10 +646,25 @@ function hasGasConfig() {
   return Boolean(config.gasWebAppUrl);
 }
 
+function getLiffShareUrl() {
+  if (typeof liff !== "undefined" && liff?.permanentLink?.createUrl) {
+    try {
+      return liff.permanentLink.createUrl();
+    } catch (_) {
+      // fall through
+    }
+  }
+  if (config.liffId) {
+    return `https://liff.line.me/${config.liffId}`;
+  }
+  throw new Error("LIFF のリンク先 URL を作成できませんでした。");
+}
+
 async function initLiff() {
   if (!config.liffId) {
     setStatus("`config.js` の `liffId` が未設定です。PNG書き出しは使えます。", "warn");
     setSendDisabled(true);
+    setSendFlexTestDisabled(true);
     setSaveTestDisabled(!hasGasConfig());
     return;
   }
@@ -643,6 +672,7 @@ async function initLiff() {
   if (location.protocol === "file:") {
     setStatus("`file://` では LIFF を初期化できません。GitHub Pages など HTTPS で開いてください。", "warn");
     setSendDisabled(true);
+    setSendFlexTestDisabled(true);
     setSaveTestDisabled(!hasGasConfig());
     return;
   }
@@ -650,6 +680,7 @@ async function initLiff() {
   if (typeof liff === "undefined") {
     setStatus("LIFF SDK の読み込みに失敗しました。", "error");
     setSendDisabled(true);
+    setSendFlexTestDisabled(true);
     setSaveTestDisabled(!hasGasConfig());
     return;
   }
@@ -672,14 +703,17 @@ async function initLiff() {
     if (config.gasWebAppUrl) {
       setStatus("LIFF の初期化が完了しました。Google Drive 保存と共有を実行できます。", "success");
       setSendDisabled(false);
+      setSendFlexTestDisabled(false);
     } else {
       setStatus("LIFF は初期化できましたが、`gasWebAppUrl` が未設定です。", "warn");
       setSendDisabled(true);
+      setSendFlexTestDisabled(true);
     }
   } catch (error) {
     state.liffError = error instanceof Error ? error.message : String(error);
     setStatus(`LIFF 初期化に失敗しました: ${state.liffError}`, "error");
     setSendDisabled(true);
+    setSendFlexTestDisabled(true);
     setSaveTestDisabled(!hasGasConfig());
   }
 }
@@ -854,6 +888,88 @@ async function sendToLine() {
   }
 }
 
+function buildFlexImageMessage(upload) {
+  return {
+    type: "flex",
+    altText: `${els.text.value || "画像"} を送信`,
+    contents: {
+      type: "bubble",
+      size: "giga",
+      hero: {
+        type: "image",
+        url: upload.originalContentUrl,
+        size: "full",
+        aspectRatio: "1:1",
+        aspectMode: "fit",
+        backgroundColor: "#00000000",
+        action: {
+          type: "uri",
+          label: "TextIconSender を開く",
+          uri: getLiffShareUrl(),
+        },
+      },
+      body: {
+        type: "box",
+        layout: "vertical",
+        contents: [],
+        paddingAll: "0px",
+        spacing: "none",
+        backgroundColor: "#00000000",
+      },
+      styles: {
+        hero: {
+          backgroundColor: "#00000000",
+        },
+        body: {
+          backgroundColor: "#00000000",
+        },
+      },
+    },
+  };
+}
+
+async function sendFlexTestToLine() {
+  if (!hasSenderConfig()) {
+    setStatus("`config.js` の `liffId` または `gasWebAppUrl` が未設定です。", "warn");
+    return;
+  }
+  if (!state.liffReady) {
+    setStatus("LIFF の初期化完了後に再度お試しください。", "warn");
+    return;
+  }
+
+  try {
+    setSendDisabled(true);
+    setSendFlexTestDisabled(true);
+    setSendFlexTestLoading(true);
+    setStatus("Google Drive へ保存して Flex 送信を準備しています。", "info");
+
+    const exportCanvas = buildExportCanvas();
+    const blob = await canvasToBlob(exportCanvas);
+    const upload = await uploadToGas(blob);
+    const message = buildFlexImageMessage(upload);
+
+    setStatus("LINE の送信先を選択してください。Flex で実機確認します。", "info");
+    const result = await liff.shareTargetPicker([message], {
+      isMultiple: true,
+    });
+
+    if (result) {
+      setStatus(`Flex送信できました。${upload.folderName} に${upload.reused ? "再利用" : "保存"}済みです。`, "success");
+    } else {
+      setStatus(`Flex送信はキャンセルされました。画像は ${upload.folderName} に${upload.reused ? "再利用" : "保存"}されています。`, "warn");
+    }
+    refreshHistorySilently();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    setStatus(`Flex送信テストに失敗しました: ${message}`, "error");
+  } finally {
+    setSendFlexTestLoading(false);
+    setSendDisabled(!state.liffReady || !config.gasWebAppUrl);
+    setSendFlexTestDisabled(!state.liffReady || !config.gasWebAppUrl);
+  }
+}
+
 async function sendHistoryItem(item) {
   if (!state.liffReady) {
     setStatus("LIFF の初期化完了後に再度お試しください。", "warn");
@@ -926,7 +1042,7 @@ Object.values(els).forEach((el) => {
         });
     }
     syncOutputs();
-    if (el === els.download || el === els.saveTest || el === els.send) return;
+    if (el === els.download || el === els.saveTest || el === els.send || el === els.sendFlexTest) return;
     generate();
   });
 });
@@ -993,6 +1109,7 @@ presetButtons.forEach((button) => {
 els.download.addEventListener("click", download);
 els.saveTest.addEventListener("click", saveToDriveTest);
 els.send.addEventListener("click", sendToLine);
+els.sendFlexTest.addEventListener("click", sendFlexTestToLine);
 els.historyToggle.addEventListener("click", () => {
   setSectionCollapsed("history", !state.sections.historyCollapsed);
 });
@@ -1019,6 +1136,7 @@ generate();
 applyLocalModeVisibility();
 initializeSectionState();
 setSendDisabled(true);
+setSendFlexTestDisabled(true);
 setSaveTestDisabled(!hasGasConfig());
 els.refreshHistory.disabled = !hasGasConfig();
 setStatus("`config.js` を確認しながら初期化しています。", "info");

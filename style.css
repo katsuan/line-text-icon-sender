@@ -908,7 +908,8 @@ canvas {
 }
 
 .sender-actions-bar #download,
-.sender-actions-bar #send {
+.sender-actions-bar #send,
+.sender-actions-bar #sendFlexTest {
   grid-row: 1;
 }
 
@@ -939,6 +940,7 @@ canvas {
 }
 
 .sender-actions-bar #send,
+.sender-actions-bar #sendFlexTest,
 .history-button[data-history-send],
 .history-controls [data-history-send] {
   background: var(--accent);
@@ -950,7 +952,8 @@ canvas {
   color: var(--accent-strong);
 }
 
-.sender-actions-bar #send.is-loading {
+.sender-actions-bar #send.is-loading,
+.sender-actions-bar #sendFlexTest.is-loading {
   display: inline-flex;
   align-items: center;
   justify-content: center;
