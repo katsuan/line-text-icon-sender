@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>💬TextIconSender</title>
+    <link rel="stylesheet" href="../style.css" />
+  </head>
+  <body class="sender-body">
+    <main class="sender-app">
+      <section class="sender-hero panel">
+        <nav class="page-nav" aria-label="ページ移動">
+          <a class="page-link" href="../index.html">Text Icon</a>
+          <a class="page-link" href="../apng.html">APNG Builder</a>
+        </nav>
+        <div class="sender-hero-copy">
+          <h1>💬TextIconSender</h1>
+          <p class="lead">
+            文字を入れた画像を保存・送信できます。
+          </p>
+        </div>
+      </section>
+
+      <section id="localStatusSection" class="sender-section panel">
+        <div class="section-head">
+          <h2>Status</h2>
+          <span>接続状態</span>
+        </div>
+        <p id="status" class="status-box is-info">初期化中です。</p>
+        <p class="sender-help">
+          公開先は GitHub Pages 想定です。`file://` で開いている間は LIFF 初期化ができないため、PNG書き出しのみ確認できます。
+        </p>
+      </section>
+
+      <section id="historySection" class="sender-section panel">
+        <div class="section-head">
+          <div class="section-head-left">
+            <button id="historyToggle" class="section-toggle" type="button" aria-expanded="true" aria-controls="historyBody" aria-label="History を閉じる">▼</button>
+            <h2>History</h2>
+            <button id="refreshHistory" class="secondary-action history-action" type="button">更新</button>
+          </div>
+          <span id="historySummary">履歴を保存・送信できます</span>
+        </div>
+        <div id="historyBody" class="section-toggle-body">
+          <div id="historyList" class="history-list" aria-live="polite">
+            <p class="sender-help">履歴を開くと読み込みます。</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="sender-section panel">
+        <div class="section-head">
+          <h2>Text</h2>
+          <span>画像に入れる文字</span>
+        </div>
+
+        <label class="field">
+          <span>テキスト</span>
+          <textarea id="text" rows="3">OK</textarea>
+        </label>
+
+        <div class="preset-row" aria-label="テキストプリセット">
+          <button class="preset-button" type="button" data-text="OK">OK</button>
+          <button class="preset-button" type="button" data-text="確認">確認</button>
+          <button class="preset-button" type="button" data-text="至急">至急</button>
+          <button class="preset-button" type="button" data-text="感謝">感謝</button>
+          <button class="preset-button" type="button" data-text="参加">参加</button>
+          <button class="preset-button" type="button" data-text="？">？</button>
+        </div>
+      </section>
+
+      <section id="styleSection" class="sender-section panel">
+        <div class="section-head">
+          <div class="section-head-left">
+            <button id="styleToggle" class="section-toggle" type="button" aria-expanded="true" aria-controls="styleBody" aria-label="Style を閉じる">▼</button>
+            <h2>Style</h2>
+            <div class="style-tabs-wrap">
+            <div class="style-tabs" role="tablist" aria-label="スタイルカテゴリ">
+              <button class="style-tab is-active" id="styleTabColor" type="button" role="tab" aria-selected="true" aria-controls="stylePanelColor" data-style-tab="color">色・枠</button>
+              <button class="style-tab" id="styleTabText" type="button" role="tab" aria-selected="false" aria-controls="stylePanelText" data-style-tab="text">文字</button>
+            </div>
+          </div>
+          </div>
+          <span id="styleSummary">見た目を整える</span>
+        </div>
+        <div id="styleBody" class="section-toggle-body">
+
+          <section class="style-panel" id="stylePanelText" role="tabpanel" aria-labelledby="styleTabText" data-style-panel="text" hidden>
+          <div class="grid two sender-grid sender-style-top">
+            <section class="field">
+              <span>文字揃え</span>
+              <div class="align-picker" role="group" aria-label="文字揃え">
+                <button class="align-button" data-align="left" type="button" aria-label="左寄せ">
+                  <span class="align-glyph"><span></span><span></span><span></span></span>
+                </button>
+                <button class="align-button is-active" data-align="center" type="button" aria-label="中央揃え">
+                  <span class="align-glyph"><span></span><span></span><span></span></span>
+                </button>
+                <button class="align-button" data-align="right" type="button" aria-label="右寄せ">
+                  <span class="align-glyph"><span></span><span></span><span></span></span>
+                </button>
+              </div>
+              <input id="align" type="hidden" value="center" />
+            </section>
+
+            <label class="field">
+              <span>フォント</span>
+              <select id="fontFamily">
+                <option value="'Noto Sans JP', 'Hiragino Sans', sans-serif" selected>Noto Sans JP</option>
+                <option value="'Noto Sans Mono', 'Menlo', monospace">Noto Sans Mono</option>
+                <option value="'Hiragino Sans', 'Yu Gothic', sans-serif">Hiragino Sans</option>
+                <option value="'Arial Black', 'Arial', sans-serif">Arial Black</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="grid two sender-grid">
+            <section class="field sender-toggle-group">
+              <span>文字サイズ</span>
+              <label class="checkline">
+                <input id="autoFit" type="checkbox" checked />
+                <span>自動調整する</span>
+              </label>
+            </section>
+
+            <label class="field size-slider-field is-hidden" id="fontSizeField">
+              <span>手動サイズ</span>
+              <input id="fontSize" type="range" min="24" max="180" value="118" />
+              <output id="fontSizeValue">118</output>
+            </label>
+          </div>
+          </section>
+
+          <section class="style-panel is-active" id="stylePanelColor" role="tabpanel" aria-labelledby="styleTabColor" data-style-panel="color">
+          <div class="grid color-grid sender-grid compact-color-grid">
+            <label class="field">
+              <span>文字色</span>
+              <input id="fillColor" type="color" value="#38ba91" />
+              <div class="swatch-row" aria-label="文字色プリセット">
+                <button class="swatch-button is-transparent" type="button" data-target="fillColor" data-color="transparent" aria-label="透明"></button>
+                <button class="swatch-button is-active" type="button" data-target="fillColor" data-color="#38ba91" style="--swatch:#38ba91;" aria-label="緑"></button>
+                <button class="swatch-button" type="button" data-target="fillColor" data-color="#3AB0C7" style="--swatch:#3AB0C7;" aria-label="青緑"></button>
+                <button class="swatch-button" type="button" data-target="fillColor" data-color="#f0c419" style="--swatch:#f0c419;" aria-label="黄"></button>
+                <button class="swatch-button" type="button" data-target="fillColor" data-color="#ff9f34" style="--swatch:#ff9f34;" aria-label="橙"></button>
+                <button class="swatch-button" type="button" data-target="fillColor" data-color="#e5484d" style="--swatch:#e5484d;" aria-label="赤"></button>
+              </div>
+            </label>
+
+            <label class="field">
+              <span>背景色</span>
+              <input id="bgColor" type="color" value="#ffffff" />
+              <div class="swatch-row" aria-label="背景色プリセット">
+                <button class="swatch-button is-active is-transparent" type="button" data-target="bgColor" data-color="transparent" aria-label="透明"></button>
+                <button class="swatch-button" type="button" data-target="bgColor" data-color="#ffffff" style="--swatch:#ffffff;" aria-label="白"></button>
+                <button class="swatch-button" type="button" data-target="bgColor" data-color="#000000" style="--swatch:#000000;" aria-label="黒"></button>
+                <button class="swatch-button" type="button" data-target="bgColor" data-color="#d7d7d7" style="--swatch:#d7d7d7;" aria-label="灰"></button>
+                <button class="swatch-button" type="button" data-target="bgColor" data-color="#1ea31e" style="--swatch:#1ea31e;" aria-label="緑"></button>
+                <button class="swatch-button" type="button" data-target="bgColor" data-color="#ff00ff" style="--swatch:#ff00ff;" aria-label="マゼンタ"></button>
+              </div>
+            </label>
+
+            <label class="field">
+              <span>枠色1</span>
+              <input id="stroke1Color" type="color" value="#000000" />
+              <div class="swatch-row" aria-label="枠色1プリセット">
+                <button class="swatch-button is-transparent" type="button" data-target="stroke1Color" data-color="transparent" aria-label="透明"></button>
+                <button class="swatch-button" type="button" data-target="stroke1Color" data-color="#ffffff" style="--swatch:#ffffff;" aria-label="白"></button>
+                <button class="swatch-button is-active" type="button" data-target="stroke1Color" data-color="#000000" style="--swatch:#000000;" aria-label="黒"></button>
+                <button class="swatch-button" type="button" data-target="stroke1Color" data-color="#38ba91" style="--swatch:#38ba91;" aria-label="緑"></button>
+                <button class="swatch-button" type="button" data-target="stroke1Color" data-color="#f0c419" style="--swatch:#f0c419;" aria-label="黄"></button>
+                <button class="swatch-button" type="button" data-target="stroke1Color" data-color="#e5484d" style="--swatch:#e5484d;" aria-label="赤"></button>
+              </div>
+            </label>
+
+            <label class="field">
+              <span>枠色2</span>
+              <input id="stroke2Color" type="color" value="#ffffff" />
+              <div class="swatch-row" aria-label="枠色2プリセット">
+                <button class="swatch-button is-transparent" type="button" data-target="stroke2Color" data-color="transparent" aria-label="透明"></button>
+                <button class="swatch-button is-active" type="button" data-target="stroke2Color" data-color="#ffffff" style="--swatch:#ffffff;" aria-label="白"></button>
+                <button class="swatch-button" type="button" data-target="stroke2Color" data-color="#000000" style="--swatch:#000000;" aria-label="黒"></button>
+                <button class="swatch-button" type="button" data-target="stroke2Color" data-color="#38ba91" style="--swatch:#38ba91;" aria-label="緑"></button>
+                <button class="swatch-button" type="button" data-target="stroke2Color" data-color="#f0c419" style="--swatch:#f0c419;" aria-label="黄"></button>
+                <button class="swatch-button" type="button" data-target="stroke2Color" data-color="#e5484d" style="--swatch:#e5484d;" aria-label="赤"></button>
+              </div>
+            </label>
+          </div>
+
+          <div class="grid two sender-grid sender-outline-row">
+            <section class="field sender-toggle-group">
+              <span>枠線</span>
+              <label class="checkline">
+                <input id="outlineEnabled" type="checkbox" checked />
+                <span>枠を表示する</span>
+              </label>
+            </section>
+
+            <label class="field" id="outlineWidthField">
+              <span>枠の太さ</span>
+              <input id="outlineWidth" type="range" min="0" max="24" value="4" />
+              <output id="outlineWidthValue">4</output>
+            </label>
+          </div>
+          </section>
+        </div>
+      </section>
+
+      <section class="sender-section panel">
+        <div class="section-head">
+          <div class="section-head-left">
+            <h2>Preview</h2>
+            <div class="preview-tabs-wrap">
+              <div class="preview-tabs" role="tablist" aria-label="プレビュー背景">
+                <button class="preview-tab is-active" id="previewTabTransparent" type="button" role="tab" aria-selected="true" aria-controls="previewPanelTransparentMobile" data-preview-tab="transparent">透過</button>
+                <button class="preview-tab" id="previewTabWhite" type="button" role="tab" aria-selected="false" aria-controls="previewPanelWhiteMobile" data-preview-tab="white">白背景</button>
+                <button class="preview-tab" id="previewTabDark" type="button" role="tab" aria-selected="false" aria-controls="previewPanelDarkMobile" data-preview-tab="dark">黒背景</button>
+              </div>
+            </div>
+          </div>
+          <span>見え方を確認</span>
+        </div>
+
+        <div class="sender-stage-wrap">
+          <div class="sender-preview-grid sender-preview-grid-desktop">
+            <div class="sender-preview-card">
+              <span>透過</span>
+              <div class="sender-stage surface-transparent">
+                <canvas id="preview" width="180" height="180" aria-label="Transparent preview"></canvas>
+              </div>
+            </div>
+            <div class="sender-preview-card">
+              <span>白背景</span>
+              <div class="sender-stage surface-white">
+                <canvas id="previewWhite" width="180" height="180" aria-label="White background preview"></canvas>
+              </div>
+            </div>
+            <div class="sender-preview-card">
+              <span>黒背景</span>
+              <div class="sender-stage surface-dark">
+                <canvas id="previewDark" width="180" height="180" aria-label="Dark background preview"></canvas>
+              </div>
+            </div>
+          </div>
+          <div class="sender-preview-mobile">
+            <section class="preview-mobile-panel is-active" id="previewPanelTransparentMobile" data-preview-panel="transparent" role="tabpanel" aria-labelledby="previewTabTransparent">
+              <div class="sender-stage surface-transparent">
+                <canvas id="previewMobileTransparent" width="180" height="180" aria-label="Transparent preview mobile"></canvas>
+              </div>
+            </section>
+            <section class="preview-mobile-panel" id="previewPanelWhiteMobile" data-preview-panel="white" role="tabpanel" aria-labelledby="previewTabWhite" hidden>
+              <div class="sender-stage surface-white">
+                <canvas id="previewMobileWhite" width="180" height="180" aria-label="White background preview mobile"></canvas>
+              </div>
+            </section>
+            <section class="preview-mobile-panel" id="previewPanelDarkMobile" data-preview-panel="dark" role="tabpanel" aria-labelledby="previewTabDark" hidden>
+              <div class="sender-stage surface-dark">
+                <canvas id="previewMobileDark" width="180" height="180" aria-label="Dark background preview mobile"></canvas>
+              </div>
+            </section>
+          </div>
+        </div>
+      </section>
+
+      <section class="sender-actions-bar panel">
+        <button id="download" class="primary-action" type="button">保存</button>
+        <button id="saveTest" class="secondary-action" type="button">Drive保存をテスト</button>
+        <button id="send" class="secondary-action" type="button">送信</button>
+        <p id="localCaption" class="sender-caption">`Drive保存をテスト` は `GAS Web App URL` だけで確認できます。`送る` は `LIFF ID` も必要です。</p>
+      </section>
+    </main>
+
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <script src="./config.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>
