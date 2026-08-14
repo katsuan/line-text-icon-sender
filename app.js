@@ -889,6 +889,7 @@ async function sendToLine() {
 }
 
 function buildFlexImageMessage(upload) {
+  const flexImageUrl = upload.previewImageUrl || upload.originalContentUrl;
   return {
     type: "flex",
     altText: `${els.text.value || "画像"} を送信`,
@@ -897,7 +898,7 @@ function buildFlexImageMessage(upload) {
       size: "giga",
       hero: {
         type: "image",
-        url: upload.originalContentUrl,
+        url: flexImageUrl,
         size: "full",
         aspectRatio: "1:1",
         aspectMode: "fit",
