@@ -513,7 +513,7 @@ function buildAssetKey() {
     outlineWidth: Number(els.outlineWidth.value),
     stroke1Color: getEffectiveColorValue(els.stroke1Color),
     stroke2Color: getEffectiveColorValue(els.stroke2Color),
-    size: "180x180",
+    size: "256x256",
   });
 }
 

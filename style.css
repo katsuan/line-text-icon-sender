@@ -742,12 +742,12 @@ button:focus-visible,
 }
 
 canvas {
-  width: 180px;
-  height: 180px;
+  width: 220px;
+  height: 220px;
   image-rendering: auto;
-  flex: 0 0 180px;
+  flex: 0 0 220px;
   border: 2px solid rgba(0, 0, 0, 0.18);
-  border-radius: 22px;
+  border-radius: 0;
   background: transparent;
 }
 
@@ -864,7 +864,7 @@ canvas {
 
 .sender-stage {
   width: 100%;
-  min-height: 210px;
+  min-height: 250px;
   display: grid;
   place-items: center;
   border-radius: 18px;
@@ -1470,10 +1470,10 @@ canvas {
 }
 
 .sender-stage canvas {
-  width: min(26vw, 180px);
-  height: min(26vw, 180px);
+  width: min(30vw, 220px);
+  height: min(30vw, 220px);
   border: 2px solid rgba(0, 0, 0, 0.18);
-  border-radius: 22px;
+  border-radius: 0;
   background: transparent;
 }
 
@@ -1568,13 +1568,13 @@ canvas {
   }
 
   .sender-stage {
-    min-height: 118px;
+    min-height: 148px;
     border-radius: 16px;
   }
 
   .sender-stage canvas {
-    width: min(28vw, 110px);
-    height: min(28vw, 110px);
+    width: min(34vw, 132px);
+    height: min(34vw, 132px);
   }
 
   .sender-preview-card > span {
