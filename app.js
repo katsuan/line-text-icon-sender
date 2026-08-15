@@ -18,6 +18,7 @@ const STORAGE_KEYS = {
   historyCollapsed: "texticon_sender_history_collapsed",
   styleCollapsed: "texticon_sender_style_collapsed",
   historyEnabled: "texticon_sender_history_enabled",
+  styleSettings: "texticon_sender_style_settings",
 };
 
 const els = {
@@ -335,6 +336,88 @@ function generate() {
   mobileTransparentCtx.drawImage(canvas, 0, 0);
   mobileWhiteCtx.drawImage(canvas, 0, 0);
   mobileDarkCtx.drawImage(canvas, 0, 0);
+  saveStyleSettings();
+}
+
+const canvasWidthInput = document.getElementById("canvasWidth");
+const canvasHeightInput = document.getElementById("canvasHeight");
+const lockSquareInput = document.getElementById("lockSquare");
+const sizePresetButtons = Array.from(document.querySelectorAll(".size-preset-button"));
+const CANVAS_SIZE_MIN = 32;
+const CANVAS_SIZE_MAX = 2048;
+const allCanvases = [
+  canvas,
+  previewWhite,
+  previewDark,
+  previewMobileTransparent,
+  previewMobileWhite,
+  previewMobileDark,
+];
+
+function clampCanvasSize(value) {
+  const num = Math.round(Number(value) || 256);
+  return Math.min(CANVAS_SIZE_MAX, Math.max(CANVAS_SIZE_MIN, num));
+}
+
+function applyCanvasSize(width, height) {
+  const w = clampCanvasSize(width);
+  const h = clampCanvasSize(height);
+  allCanvases.forEach((c) => {
+    c.width = w;
+    c.height = h;
+  });
+  canvasWidthInput.value = w;
+  canvasHeightInput.value = h;
+  generate();
+}
+
+function handleWidthChange() {
+  const w = clampCanvasSize(canvasWidthInput.value);
+  const h = lockSquareInput.checked ? w : clampCanvasSize(canvasHeightInput.value);
+  applyCanvasSize(w, h);
+}
+
+function handleHeightChange() {
+  const h = clampCanvasSize(canvasHeightInput.value);
+  const w = lockSquareInput.checked ? h : clampCanvasSize(canvasWidthInput.value);
+  applyCanvasSize(w, h);
+}
+
+canvasWidthInput.addEventListener("input", handleWidthChange);
+canvasHeightInput.addEventListener("input", handleHeightChange);
+lockSquareInput.addEventListener("change", () => {
+  if (lockSquareInput.checked) {
+    applyCanvasSize(canvasWidthInput.value, canvasWidthInput.value);
+  }
+});
+sizePresetButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    const w = Number(button.dataset.width);
+    const h = Number(button.dataset.height);
+    lockSquareInput.checked = w === h;
+    applyCanvasSize(w, h);
+  });
+});
+
+function gcd(a, b) {
+  return b === 0 ? a : gcd(b, a % b);
+}
+
+function buildAspectRatio(width, height) {
+  const w = Math.max(1, Math.round(Number(width) || 1));
+  const h = Math.max(1, Math.round(Number(height) || 1));
+  const divisor = gcd(w, h) || 1;
+  let ratioW = w / divisor;
+  let ratioH = h / divisor;
+  const ratio = ratioW / ratioH;
+  if (ratio > 3) {
+    ratioW = 3;
+    ratioH = 1;
+  } else if (ratio < 1 / 3) {
+    ratioW = 1;
+    ratioH = 3;
+  }
+  return `${ratioW}:${ratioH}`;
 }
 
 function buildExportCanvas() {
@@ -444,6 +527,93 @@ function saveStoredBoolean(key, value) {
   }
 }
 
+function collectStyleSettings() {
+  return {
+    align: els.align.value,
+    fontFamily: els.fontFamily.value,
+    autoFit: els.autoFit.checked,
+    fontSize: els.fontSize.value,
+    bgColorValue: getEffectiveColorValue(els.bgColor),
+    fillColorValue: getEffectiveColorValue(els.fillColor),
+    stroke1ColorValue: getEffectiveColorValue(els.stroke1Color),
+    stroke2ColorValue: getEffectiveColorValue(els.stroke2Color),
+    outlineEnabled: els.outlineEnabled.checked,
+    outlineWidth: els.outlineWidth.value,
+    canvasWidth: canvas.width,
+    canvasHeight: canvas.height,
+    lockSquare: lockSquareInput.checked,
+  };
+}
+
+function saveStyleSettings() {
+  try {
+    window.localStorage.setItem(STORAGE_KEYS.styleSettings, JSON.stringify(collectStyleSettings()));
+  } catch (_) {
+    // ignore storage errors
+  }
+}
+
+function loadStyleSettings() {
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEYS.styleSettings);
+    return raw ? JSON.parse(raw) : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function applyStoredColor(input, colorValue) {
+  if (!colorValue) return;
+  input.dataset.colorValue = colorValue;
+  if (colorValue !== "transparent") {
+    input.value = colorValue;
+  }
+  syncColorInputState(input);
+  swatchButtons
+    .filter((button) => button.dataset.target === input.id)
+    .forEach((button) => {
+      button.classList.toggle("is-active", button.dataset.color === colorValue);
+    });
+}
+
+function applyStyleSettings(settings) {
+  if (!settings) return false;
+
+  if (settings.align) {
+    els.align.value = settings.align;
+    alignButtons.forEach((button) => {
+      button.classList.toggle("is-active", button.dataset.align === settings.align);
+    });
+  }
+  if (settings.fontFamily) els.fontFamily.value = settings.fontFamily;
+  if (typeof settings.autoFit === "boolean") els.autoFit.checked = settings.autoFit;
+  if (settings.fontSize) els.fontSize.value = settings.fontSize;
+
+  applyStoredColor(els.bgColor, settings.bgColorValue);
+  applyStoredColor(els.fillColor, settings.fillColorValue);
+  applyStoredColor(els.stroke1Color, settings.stroke1ColorValue);
+  applyStoredColor(els.stroke2Color, settings.stroke2ColorValue);
+
+  if (typeof settings.outlineEnabled === "boolean") els.outlineEnabled.checked = settings.outlineEnabled;
+  if (settings.outlineWidth) els.outlineWidth.value = settings.outlineWidth;
+
+  if (settings.canvasWidth && settings.canvasHeight) {
+    const w = clampCanvasSize(settings.canvasWidth);
+    const h = clampCanvasSize(settings.canvasHeight);
+    allCanvases.forEach((c) => {
+      c.width = w;
+      c.height = h;
+    });
+    canvasWidthInput.value = w;
+    canvasHeightInput.value = h;
+  }
+  if (typeof settings.lockSquare === "boolean") {
+    lockSquareInput.checked = settings.lockSquare;
+  }
+
+  return true;
+}
+
 function updateToggleButton(button, collapsed) {
   if (!button) return;
   const sectionName = button === els.historyToggle ? "History" : "Style";
@@ -551,7 +721,7 @@ function buildAssetKey() {
     outlineWidth: Number(els.outlineWidth.value),
     stroke1Color: getEffectiveColorValue(els.stroke1Color),
     stroke2Color: getEffectiveColorValue(els.stroke2Color),
-    size: "256x256",
+    size: `${canvas.width}x${canvas.height}`,
   });
 }
 
@@ -894,6 +1064,8 @@ async function uploadToGasWithOptions(blob, options = {}) {
     userKey: getEffectiveUserKey(),
     assetKey: buildAssetKey(),
     keepHistory: options.keepHistory ?? state.historyEnabled,
+    width: canvas.width,
+    height: canvas.height,
     imageBase64: await blobToBase64(blob),
   };
 
@@ -1101,6 +1273,7 @@ async function sendToLine() {
 
 function buildFlexImageMessage(upload) {
   const flexImageUrl = upload.previewImageUrl || upload.originalContentUrl;
+  const aspectRatio = buildAspectRatio(upload.width || canvas.width, upload.height || canvas.height);
   return {
     type: "flex",
     altText: `${els.text.value || "画像"} - 💬TextIconSender`,
@@ -1111,7 +1284,7 @@ function buildFlexImageMessage(upload) {
         type: "image",
         url: flexImageUrl,
         size: "full",
-        aspectRatio: "1:1",
+        aspectRatio,
         aspectMode: "fit",
         backgroundColor: "#00000000",
         action: {
@@ -1301,17 +1474,20 @@ els.historyEnabled.addEventListener("change", () => {
   setHistoryEnabled(els.historyEnabled.checked);
 });
 
+const restoredStyleSettings = applyStyleSettings(loadStyleSettings());
+if (!restoredStyleSettings) {
+  [
+    els.bgColor,
+    els.fillColor,
+    els.stroke1Color,
+    els.stroke2Color,
+  ].forEach((input) => {
+    if (input instanceof HTMLInputElement) {
+      syncColorInputFromActiveSwatch(input);
+    }
+  });
+}
 syncOutputs();
-[
-  els.bgColor,
-  els.fillColor,
-  els.stroke1Color,
-  els.stroke2Color,
-].forEach((input) => {
-  if (input instanceof HTMLInputElement) {
-    syncColorInputFromActiveSwatch(input);
-  }
-});
 generate();
 applyLocalModeVisibility();
 initializeSectionState();

@@ -1,6 +1,8 @@
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 const DRIVE_FOLDER_ID_KEY = 'DRIVE_FOLDER_ID';
 const FLEX_HISTORY_FOLDER_NAME = '_flex_sent';
+const NO_HISTORY_FOLDER_NAME = '_no_history';
+const NO_HISTORY_KEEP_COUNT = 3;
 
 function doGet(e) {
   try {
@@ -13,6 +15,7 @@ function doGet(e) {
       const userKey = sanitizeDriveName_(params.userKey || 'local_debug');
       const limit = Math.max(1, Math.min(Number(params.limit || 12), 30));
       const userFolder = getOrCreateChildFolder_(rootFolder, userKey);
+      cleanupNoHistoryFolder_(userFolder);
       return jsonResponse({
         ok: true,
         action: 'history',
@@ -49,6 +52,8 @@ function doPost(e) {
     const userKey = sanitizeDriveName_(payload.userKey || 'local_debug');
     const assetKey = String(payload.assetKey || fileName);
     const keepHistory = payload.keepHistory !== false;
+    const width = Math.max(1, Math.round(Number(payload.width) || 256));
+    const height = Math.max(1, Math.round(Number(payload.height) || 256));
 
     if (payload.action === 'delete') {
       const rootFolder = DriveApp.getFolderById(driveFolderId);
@@ -101,15 +106,24 @@ function doPost(e) {
     const rootFolder = DriveApp.getFolderById(driveFolderId);
     const userFolder = getOrCreateChildFolder_(rootFolder, userKey);
     const storedFileName = buildStoredFileName_(assetKey, mimeType);
-    const existingFile = findFileByName_(userFolder, storedFileName);
+    const existingFile = findExistingUploadFile_(userFolder, storedFileName);
     const file = existingFile || createDriveFile_(userFolder, imageBase64, mimeType, storedFileName);
     updateFileMetadata_(file, {
       sourceFileName: fileName,
       text: payload.text || '',
       savedAt: new Date().toISOString(),
       keepHistory: keepHistory,
+      width: width,
+      height: height,
     });
     file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+    if (keepHistory) {
+      file.moveTo(userFolder);
+    } else {
+      const hiddenFolder = getOrCreateChildFolder_(userFolder, NO_HISTORY_FOLDER_NAME);
+      file.moveTo(hiddenFolder);
+    }
 
     const fileId = file.getId();
     const publicUrl = buildDrivePublicUrl(fileId);
@@ -128,6 +142,8 @@ function doPost(e) {
       previewImageUrl: buildDriveThumbnailUrl(fileId),
       webViewLink: file.getUrl(),
       createdAt: new Date().toISOString(),
+      width: width,
+      height: height,
     });
   } catch (error) {
     return jsonResponse({
@@ -158,6 +174,40 @@ function getOrCreateChildFolder_(parentFolder, folderName) {
 function findFileByName_(folder, fileName) {
   const files = folder.getFilesByName(fileName);
   return files.hasNext() ? files.next() : null;
+}
+
+function findExistingUploadFile_(userFolder, storedFileName) {
+  const direct = findFileByName_(userFolder, storedFileName);
+  if (direct) {
+    return direct;
+  }
+  const hiddenFolders = userFolder.getFoldersByName(NO_HISTORY_FOLDER_NAME);
+  if (hiddenFolders.hasNext()) {
+    return findFileByName_(hiddenFolders.next(), storedFileName);
+  }
+  return null;
+}
+
+function cleanupNoHistoryFolder_(userFolder) {
+  const hiddenFolders = userFolder.getFoldersByName(NO_HISTORY_FOLDER_NAME);
+  if (!hiddenFolders.hasNext()) {
+    return;
+  }
+  const hiddenFolder = hiddenFolders.next();
+  const files = [];
+  const iterator = hiddenFolder.getFiles();
+  while (iterator.hasNext()) {
+    files.push(iterator.next());
+  }
+  if (files.length <= NO_HISTORY_KEEP_COUNT) {
+    return;
+  }
+  files.sort(function(a, b) {
+    return b.getDateCreated().getTime() - a.getDateCreated().getTime();
+  });
+  files.slice(NO_HISTORY_KEEP_COUNT).forEach(function(file) {
+    file.setTrashed(true);
+  });
 }
 
 function findFileByIdRecursive_(folder, fileId) {
@@ -221,6 +271,8 @@ function collectHistoryItems_(folder, items) {
       text: metadata.text || '',
       flexLocked: metadata.flexLocked === true,
       sentMode: metadata.sentMode || '',
+      width: Math.max(1, Math.round(Number(metadata.width) || 256)),
+      height: Math.max(1, Math.round(Number(metadata.height) || 256)),
     });
   }
 

@@ -78,12 +78,38 @@
             <div class="style-tabs" role="tablist" aria-label="スタイルカテゴリ">
               <button class="style-tab is-active" id="styleTabColor" type="button" role="tab" aria-selected="true" aria-controls="stylePanelColor" data-style-tab="color">色・枠</button>
               <button class="style-tab" id="styleTabText" type="button" role="tab" aria-selected="false" aria-controls="stylePanelText" data-style-tab="text">文字</button>
+              <button class="style-tab" id="styleTabSize" type="button" role="tab" aria-selected="false" aria-controls="stylePanelSize" data-style-tab="size">サイズ</button>
             </div>
           </div>
           </div>
           <span id="styleSummary">見た目を整える</span>
         </div>
         <div id="styleBody" class="section-toggle-body">
+
+          <section class="style-panel" id="stylePanelSize" role="tabpanel" aria-labelledby="styleTabSize" data-style-panel="size" hidden>
+          <div class="grid two sender-grid sender-size-row">
+            <label class="field">
+              <span>幅 (px)</span>
+              <input id="canvasWidth" type="number" min="32" max="2048" step="1" value="256" inputmode="numeric" />
+            </label>
+            <label class="field">
+              <span>高さ (px)</span>
+              <input id="canvasHeight" type="number" min="32" max="2048" step="1" value="256" inputmode="numeric" />
+            </label>
+          </div>
+          <div class="grid two sender-grid sender-size-row">
+            <label class="checkline">
+              <input id="lockSquare" type="checkbox" checked />
+              <span>正方形を維持する</span>
+            </label>
+            <div class="preset-row" aria-label="サイズプリセット">
+              <button class="preset-button size-preset-button" type="button" data-width="256" data-height="256">256×256</button>
+              <button class="preset-button size-preset-button" type="button" data-width="512" data-height="512">512×512</button>
+              <button class="preset-button size-preset-button" type="button" data-width="320" data-height="240">320×240</button>
+              <button class="preset-button size-preset-button" type="button" data-width="240" data-height="320">240×320</button>
+            </div>
+          </div>
+          </section>
 
           <section class="style-panel" id="stylePanelText" role="tabpanel" aria-labelledby="styleTabText" data-style-panel="text" hidden>
           <div class="grid two sender-grid sender-style-top">
