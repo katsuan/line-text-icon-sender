@@ -41,7 +41,7 @@
           </div>
           <span id="historySummary">履歴を保存・送信できます</span>
         </div>
-        <p class="sender-help"><strong>Flex送信</strong>した画像は、履歴保存設定に関わらず履歴に残り続けます。</p>
+        <p class="sender-help"><strong>Flex送信</strong>した画像は、履歴保存設定に関わらず常に履歴に残ります。</p>
         <div id="historyBody" class="section-toggle-body">
           <div id="historyList" class="history-list" aria-live="polite">
             <p class="sender-help">履歴を開くと読み込みます。</p>
@@ -99,17 +99,17 @@
               <input id="canvasHeight" type="number" min="32" max="1024" step="1" value="256" inputmode="numeric" />
             </label>
           </div>
-          <div class="grid two sender-grid sender-size-row">
-            <label class="checkline">
-              <input id="lockSquare" type="checkbox" checked />
-              <span>正方形を維持する</span>
-            </label>
-            <div class="preset-row" aria-label="サイズプリセット">
-              <button class="preset-button size-preset-button" type="button" data-width="256" data-height="256">256×256</button>
-              <button class="preset-button size-preset-button" type="button" data-width="512" data-height="512">512×512</button>
-              <button class="preset-button size-preset-button" type="button" data-width="320" data-height="240">320×240</button>
-              <button class="preset-button size-preset-button" type="button" data-width="240" data-height="320">240×320</button>
-            </div>
+          <label class="checkline">
+            <input id="lockSquare" type="checkbox" checked />
+            <span>正方形を維持する</span>
+          </label>
+          <div class="preset-row" aria-label="サイズプリセット">
+            <button class="preset-button size-preset-button" type="button" data-width="32" data-height="32">32×32(最小)</button>
+            <button class="preset-button size-preset-button" type="button" data-width="256" data-height="256">256×256</button>
+            <button class="preset-button size-preset-button" type="button" data-width="512" data-height="512">512×512</button>
+            <button class="preset-button size-preset-button" type="button" data-width="320" data-height="240">320×240</button>
+            <button class="preset-button size-preset-button" type="button" data-width="240" data-height="320">240×320</button>
+            <button class="preset-button size-preset-button" type="button" data-width="1024" data-height="1024">1024×1024(最大)</button>
           </div>
           </section>
 
@@ -123,8 +123,8 @@
               <button class="preset-button motion-preset-button" type="button" data-motion-preset="yshake">縦揺れ</button>
               <button class="preset-button motion-preset-button" type="button" data-motion-preset="hop">ホップ</button>
               <button class="preset-button motion-preset-button" type="button" data-motion-preset="zoom">ズーム</button>
-              <button class="preset-button motion-preset-button" type="button" data-motion-preset="flowRight">右へ流れる</button>
               <button class="preset-button motion-preset-button" type="button" data-motion-preset="flowLeft">左へ流れる</button>
+              <button class="preset-button motion-preset-button" type="button" data-motion-preset="flowRight">右へ流れる</button>
             </div>
             <input id="motionPreset" type="hidden" value="none" />
           </section>
@@ -210,9 +210,9 @@
             </label>
 
             <label class="field">
-              <span>枠色1</span>
+              <span>文字枠1</span>
               <input id="stroke1Color" type="color" value="#000000" />
-              <div class="swatch-row" aria-label="枠色1プリセット">
+              <div class="swatch-row" aria-label="文字枠1プリセット">
                 <button class="swatch-button is-transparent" type="button" data-target="stroke1Color" data-color="transparent" aria-label="透明"></button>
                 <button class="swatch-button" type="button" data-target="stroke1Color" data-color="#ffffff" style="--swatch:#ffffff;" aria-label="白"></button>
                 <button class="swatch-button is-active" type="button" data-target="stroke1Color" data-color="#000000" style="--swatch:#000000;" aria-label="黒"></button>
@@ -223,9 +223,9 @@
             </label>
 
             <label class="field">
-              <span>枠色2</span>
+              <span>文字枠2</span>
               <input id="stroke2Color" type="color" value="#ffffff" />
-              <div class="swatch-row" aria-label="枠色2プリセット">
+              <div class="swatch-row" aria-label="文字枠2プリセット">
                 <button class="swatch-button is-transparent" type="button" data-target="stroke2Color" data-color="transparent" aria-label="透明"></button>
                 <button class="swatch-button is-active" type="button" data-target="stroke2Color" data-color="#ffffff" style="--swatch:#ffffff;" aria-label="白"></button>
                 <button class="swatch-button" type="button" data-target="stroke2Color" data-color="#000000" style="--swatch:#000000;" aria-label="黒"></button>
@@ -241,12 +241,12 @@
               <span>文字の枠線</span>
               <label class="checkline">
                 <input id="outlineEnabled" type="checkbox" checked />
-                <span>枠を表示する</span>
+                <span>文字枠を表示する</span>
               </label>
             </section>
 
             <label class="field" id="outlineWidthField">
-              <span>枠の太さ</span>
+              <span>文字枠の太さ</span>
               <input id="outlineWidth" type="range" min="0" max="24" value="4" />
               <output id="outlineWidthValue">4</output>
             </label>
