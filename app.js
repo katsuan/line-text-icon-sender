@@ -1642,7 +1642,7 @@ function buildFlexImageMessage(upload) {
           ? [
               {
                 type: "text",
-                text: "※ご利用の端末や文字内容によっては、アニメーションが再生されず静止画で表示される場合があります。",
+                text: "※ご利用の端末や内容によっては、アニメーション画像が再生されない場合があります。",
                 size: "xxs",
                 color: "#999999",
                 wrap: true,
