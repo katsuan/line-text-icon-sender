@@ -314,7 +314,7 @@ function getRequiredScriptProperty_(key) {
 }
 
 function buildDrivePublicUrl(fileId) {
-  return 'https://drive.google.com/uc?export=view&id=' + encodeURIComponent(fileId);
+  return 'https://drive.usercontent.google.com/download?id=' + encodeURIComponent(fileId) + '&export=view';
 }
 
 function buildDriveThumbnailUrl(fileId) {
