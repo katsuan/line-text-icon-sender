@@ -37,6 +37,8 @@ const els = {
   outlineWidth: document.getElementById("outlineWidth"),
   outlineWidthField: document.getElementById("outlineWidthField"),
   outlineWidthValue: document.getElementById("outlineWidthValue"),
+  motionPreset: document.getElementById("motionPreset"),
+  motionWrapX: document.getElementById("motionWrapX"),
   download: document.getElementById("download"),
   saveTest: document.getElementById("saveTest"),
   send: document.getElementById("send"),
@@ -113,7 +115,14 @@ function syncColorInputFromActiveSwatch(input) {
 }
 
 function renderToContext(targetCtx, options = {}) {
-  const { showOuterGuide = false } = options;
+  const { showOuterGuide = false, transform = {} } = options;
+  const {
+    offsetX = 0,
+    offsetY = 0,
+    scale = 1,
+    rotation = 0,
+    wrapX = false,
+  } = transform;
   const text = els.text.value || " ";
   const lines = text.split("\n");
   const outlineWidth = els.outlineEnabled.checked ? Number(els.outlineWidth.value) : 0;
@@ -209,16 +218,28 @@ function renderToContext(targetCtx, options = {}) {
   maskCtx.drawImage(textMaskCanvas, 0, 0);
   maskCtx.drawImage(emojiMaskCanvas, 0, 0);
 
-  if (fillColor === "transparent") {
-    targetCtx.save();
-    targetCtx.globalCompositeOperation = "destination-out";
-    targetCtx.drawImage(maskCanvas, 0, 0);
-    targetCtx.restore();
-  }
+  const tileOffsets = wrapX ? [-canvas.width, 0, canvas.width] : [0];
+  const centerX = canvas.width / 2 + offsetX;
+  const centerY = canvas.height / 2 + offsetY;
 
-  drawRasterOutline(targetCtx, maskCanvas, stroke1 + stroke2, getEffectiveColorValue(els.stroke2Color));
-  drawRasterOutline(targetCtx, maskCanvas, stroke1, getEffectiveColorValue(els.stroke1Color));
-  targetCtx.drawImage(contentCanvas, 0, 0);
+  tileOffsets.forEach((tileX) => {
+    targetCtx.save();
+    targetCtx.translate(centerX + tileX, centerY);
+    targetCtx.rotate((rotation * Math.PI) / 180);
+    targetCtx.scale(scale, scale);
+    targetCtx.translate(-canvas.width / 2, -canvas.height / 2);
+
+    if (fillColor === "transparent") {
+      targetCtx.save();
+      targetCtx.globalCompositeOperation = "destination-out";
+      targetCtx.drawImage(maskCanvas, 0, 0);
+      targetCtx.restore();
+    }
+    drawRasterOutline(targetCtx, maskCanvas, stroke1 + stroke2, getEffectiveColorValue(els.stroke2Color));
+    drawRasterOutline(targetCtx, maskCanvas, stroke1, getEffectiveColorValue(els.stroke1Color));
+    targetCtx.drawImage(contentCanvas, 0, 0);
+    targetCtx.restore();
+  });
 }
 
 function syncOutputs() {
@@ -326,8 +347,12 @@ function getCircleOffsets(radius) {
   return points;
 }
 
-function generate() {
-  renderToContext(ctx, { showOuterGuide: true });
+let previewAnimationFrameId = null;
+let previewAnimationStart = 0;
+const PREVIEW_LOOP_DURATION_MS = 900;
+
+function renderPreviewFrame(transform) {
+  renderToContext(ctx, { showOuterGuide: true, transform });
   whiteCtx.clearRect(0, 0, previewWhite.width, previewWhite.height);
   darkCtx.clearRect(0, 0, previewDark.width, previewDark.height);
   whiteCtx.drawImage(canvas, 0, 0);
@@ -338,6 +363,35 @@ function generate() {
   mobileTransparentCtx.drawImage(canvas, 0, 0);
   mobileWhiteCtx.drawImage(canvas, 0, 0);
   mobileDarkCtx.drawImage(canvas, 0, 0);
+}
+
+function stopPreviewAnimation() {
+  if (previewAnimationFrameId !== null) {
+    cancelAnimationFrame(previewAnimationFrameId);
+    previewAnimationFrameId = null;
+  }
+}
+
+function startPreviewAnimation() {
+  const presetName = els.motionPreset.value;
+  const wrapX = els.motionWrapX.checked;
+  previewAnimationStart = performance.now();
+  const step = (now) => {
+    const elapsed = now - previewAnimationStart;
+    const t = (elapsed % PREVIEW_LOOP_DURATION_MS) / PREVIEW_LOOP_DURATION_MS;
+    renderPreviewFrame({ ...computeMotionTransform(presetName, t), wrapX });
+    previewAnimationFrameId = requestAnimationFrame(step);
+  };
+  previewAnimationFrameId = requestAnimationFrame(step);
+}
+
+function generate() {
+  stopPreviewAnimation();
+  if (els.motionPreset.value !== "none") {
+    startPreviewAnimation();
+  } else {
+    renderPreviewFrame({});
+  }
   saveStyleSettings();
 }
 
@@ -346,7 +400,7 @@ const canvasHeightInput = document.getElementById("canvasHeight");
 const lockSquareInput = document.getElementById("lockSquare");
 const sizePresetButtons = Array.from(document.querySelectorAll(".size-preset-button"));
 const CANVAS_SIZE_MIN = 32;
-const CANVAS_SIZE_MAX = 2048;
+const CANVAS_SIZE_MAX = 1024;
 const allCanvases = [
   canvas,
   previewWhite,
@@ -431,13 +485,22 @@ function buildExportCanvas() {
   return exportCanvas;
 }
 
-function download() {
-  const exportCanvas = buildExportCanvas();
-  const link = document.createElement("a");
-  const safe = (els.text.value || "texticon").replace(/[^\p{L}\p{N}_-]+/gu, "_");
-  link.href = exportCanvas.toDataURL("image/png");
-  link.download = `${safe || "texticon_sender"}.png`;
-  link.click();
+async function download() {
+  try {
+    const safe = (els.text.value || "texticon").replace(/[^\p{L}\p{N}_-]+/gu, "_");
+    const blob = els.motionPreset.value !== "none"
+      ? await buildAnimationBlob()
+      : await canvasToBlob(buildExportCanvas());
+    const objectUrl = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = objectUrl;
+    link.download = `${safe || "texticon_sender"}.png`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    setStatus(`保存に失敗しました: ${message}`, "error");
+  }
 }
 
 async function saveHistoryItem(item) {
@@ -544,6 +607,8 @@ function collectStyleSettings() {
     canvasWidth: canvas.width,
     canvasHeight: canvas.height,
     lockSquare: lockSquareInput.checked,
+    motionPreset: els.motionPreset.value,
+    motionWrapX: els.motionWrapX.checked,
   };
 }
 
@@ -611,6 +676,12 @@ function applyStyleSettings(settings) {
   }
   if (typeof settings.lockSquare === "boolean") {
     lockSquareInput.checked = settings.lockSquare;
+  }
+  if (settings.motionPreset) {
+    els.motionPreset.value = settings.motionPreset;
+  }
+  if (typeof settings.motionWrapX === "boolean") {
+    els.motionWrapX.checked = settings.motionWrapX;
   }
 
   return true;
@@ -724,6 +795,8 @@ function buildAssetKey() {
     stroke1Color: getEffectiveColorValue(els.stroke1Color),
     stroke2Color: getEffectiveColorValue(els.stroke2Color),
     size: `${canvas.width}x${canvas.height}`,
+    motionPreset: els.motionPreset.value,
+    motionWrapX: els.motionWrapX.checked,
   });
 }
 
@@ -1035,6 +1108,188 @@ function canvasToBlob(exportCanvas) {
   });
 }
 
+const APNG_MAX_BYTES = 300 * 1024;
+const APNG_FRAME_DURATION_MS = 70;
+const APNG_FRAME_COUNTS = [12, 8, 6, 4];
+
+const PNG_SIGNATURE = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
+const CRC32_TABLE = (() => {
+  const table = new Uint32Array(256);
+  for (let n = 0; n < 256; n += 1) {
+    let c = n;
+    for (let k = 0; k < 8; k += 1) {
+      c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    }
+    table[n] = c >>> 0;
+  }
+  return table;
+})();
+
+function crc32(bytes) {
+  let c = 0xffffffff;
+  for (let i = 0; i < bytes.length; i += 1) {
+    c = CRC32_TABLE[(c ^ bytes[i]) & 0xff] ^ (c >>> 8);
+  }
+  return (c ^ 0xffffffff) >>> 0;
+}
+
+function buildPngChunk(type, data) {
+  const typeBytes = new TextEncoder().encode(type);
+  const chunk = new Uint8Array(8 + data.length + 4);
+  const view = new DataView(chunk.buffer);
+  view.setUint32(0, data.length, false);
+  chunk.set(typeBytes, 4);
+  chunk.set(data, 8);
+  view.setUint32(8 + data.length, crc32(chunk.subarray(4, 8 + data.length)), false);
+  return chunk;
+}
+
+function parsePngChunks(buffer) {
+  const bytes = new Uint8Array(buffer);
+  const view = new DataView(buffer);
+  const chunks = [];
+  let offset = 8;
+  while (offset < bytes.length) {
+    const length = view.getUint32(offset, false);
+    const type = new TextDecoder().decode(bytes.subarray(offset + 4, offset + 8));
+    chunks.push({ type, data: bytes.subarray(offset + 8, offset + 8 + length) });
+    offset += 12 + length;
+  }
+  return chunks;
+}
+
+async function extractPngFrameParts(blob) {
+  const buffer = await blob.arrayBuffer();
+  const chunks = parsePngChunks(buffer);
+  const ihdr = chunks.find((chunk) => chunk.type === "IHDR").data;
+  const idatChunks = chunks.filter((chunk) => chunk.type === "IDAT");
+  const idatLength = idatChunks.reduce((sum, chunk) => sum + chunk.data.length, 0);
+  const idatData = new Uint8Array(idatLength);
+  let pos = 0;
+  idatChunks.forEach((chunk) => {
+    idatData.set(chunk.data, pos);
+    pos += chunk.data.length;
+  });
+  return { ihdr, idatData };
+}
+
+function buildFcTLChunk(sequenceNumber, width, height, delayMs) {
+  const data = new Uint8Array(26);
+  const view = new DataView(data.buffer);
+  view.setUint32(0, sequenceNumber, false);
+  view.setUint32(4, width, false);
+  view.setUint32(8, height, false);
+  view.setUint32(12, 0, false);
+  view.setUint32(16, 0, false);
+  view.setUint16(20, Math.round(delayMs), false);
+  view.setUint16(22, 1000, false);
+  data[24] = 0;
+  data[25] = 0;
+  return buildPngChunk("fcTL", data);
+}
+
+async function buildApngBlob(frameBlobs, width, height, delayMs, numPlays) {
+  const parts = await Promise.all(frameBlobs.map(extractPngFrameParts));
+
+  const acTLData = new Uint8Array(8);
+  const acTLView = new DataView(acTLData.buffer);
+  acTLView.setUint32(0, parts.length, false);
+  acTLView.setUint32(4, numPlays, false);
+
+  const outputChunks = [
+    buildPngChunk("IHDR", parts[0].ihdr),
+    buildPngChunk("acTL", acTLData),
+  ];
+
+  let sequenceNumber = 0;
+  parts.forEach((part, index) => {
+    outputChunks.push(buildFcTLChunk(sequenceNumber, width, height, delayMs));
+    sequenceNumber += 1;
+    if (index === 0) {
+      outputChunks.push(buildPngChunk("IDAT", part.idatData));
+    } else {
+      const fdatData = new Uint8Array(4 + part.idatData.length);
+      new DataView(fdatData.buffer).setUint32(0, sequenceNumber, false);
+      sequenceNumber += 1;
+      fdatData.set(part.idatData, 4);
+      outputChunks.push(buildPngChunk("fdAT", fdatData));
+    }
+  });
+  outputChunks.push(buildPngChunk("IEND", new Uint8Array(0)));
+
+  const totalLength = PNG_SIGNATURE.length + outputChunks.reduce((sum, chunk) => sum + chunk.length, 0);
+  const out = new Uint8Array(totalLength);
+  out.set(PNG_SIGNATURE, 0);
+  let pos = PNG_SIGNATURE.length;
+  outputChunks.forEach((chunk) => {
+    out.set(chunk, pos);
+    pos += chunk.length;
+  });
+
+  return new Blob([out], { type: "image/png" });
+}
+
+function computeMotionTransform(presetName, t) {
+  const base = Math.min(canvas.width, canvas.height);
+  const shakeAmplitude = base * (10 / 180);
+  const hopAmplitude = base * (16 / 180);
+
+  if (presetName === "xshake") {
+    return {
+      offsetX: Math.round(Math.sin(t * Math.PI * 2) * shakeAmplitude),
+      rotation: Math.round(Math.sin(t * Math.PI * 2) * 4),
+    };
+  }
+  if (presetName === "yshake") {
+    return { offsetY: Math.round(Math.sin(t * Math.PI * 2) * shakeAmplitude) };
+  }
+  if (presetName === "hop") {
+    return {
+      offsetY: -Math.round(Math.sin(t * Math.PI) * hopAmplitude),
+      scale: 1 + Math.sin(t * Math.PI) * 0.06,
+    };
+  }
+  if (presetName === "zoom") {
+    return { scale: 0.9 + Math.sin(t * Math.PI) * 0.16 };
+  }
+  if (presetName === "flowRight") {
+    return { offsetX: Math.round(-canvas.width + canvas.width * 2 * t) };
+  }
+  if (presetName === "flowLeft") {
+    return { offsetX: Math.round(canvas.width - canvas.width * 2 * t) };
+  }
+  return {};
+}
+
+async function renderMotionFrameBlobs(frameCount) {
+  const presetName = els.motionPreset.value;
+  const wrapX = els.motionWrapX.checked;
+  const blobs = [];
+  for (let i = 0; i < frameCount; i += 1) {
+    const t = frameCount <= 1 ? 0 : i / (frameCount - 1);
+    const isEdgeFrame = i === 0 || i === frameCount - 1;
+    const transform = isEdgeFrame ? {} : computeMotionTransform(presetName, t);
+    const frameCanvas = document.createElement("canvas");
+    frameCanvas.width = canvas.width;
+    frameCanvas.height = canvas.height;
+    renderToContext(frameCanvas.getContext("2d"), { transform: { ...transform, wrapX } });
+    blobs.push(await canvasToBlob(frameCanvas));
+  }
+  return blobs;
+}
+
+async function buildAnimationBlob() {
+  let lastBlob = null;
+  for (const frameCount of APNG_FRAME_COUNTS) {
+    const frameBlobs = await renderMotionFrameBlobs(frameCount);
+    lastBlob = await buildApngBlob(frameBlobs, canvas.width, canvas.height, APNG_FRAME_DURATION_MS, 0);
+    if (lastBlob.size <= APNG_MAX_BYTES) {
+      return lastBlob;
+    }
+  }
+  return lastBlob;
+}
+
 function blobToBase64(blob) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -1052,10 +1307,6 @@ function blobToBase64(blob) {
   });
 }
 
-async function uploadToGas(blob) {
-  return uploadToGasWithOptions(blob);
-}
-
 async function uploadToGasWithOptions(blob, options = {}) {
   const safe = (els.text.value || "texticon").replace(/[^\p{L}\p{N}_-]+/gu, "_");
   const payload = {
@@ -1068,6 +1319,7 @@ async function uploadToGasWithOptions(blob, options = {}) {
     keepHistory: options.keepHistory ?? state.historyEnabled,
     width: canvas.width,
     height: canvas.height,
+    animated: Boolean(options.animated),
     imageBase64: await blobToBase64(blob),
   };
 
@@ -1233,12 +1485,13 @@ async function sendToLine() {
     }
 
     const isFlex = mode === "flex";
+    const isAnimated = els.motionPreset.value !== "none";
     setStatus(`Google Drive へ保存しています。${isFlex ? "Flex送信した画像は履歴に残り、あとから削除できません。" : ""}`, "info");
 
-    const exportCanvas = buildExportCanvas();
-    const blob = await canvasToBlob(exportCanvas);
+    const blob = isAnimated ? await buildAnimationBlob() : await canvasToBlob(buildExportCanvas());
     const upload = await uploadToGasWithOptions(blob, {
       keepHistory: isFlex ? true : state.historyEnabled,
+      animated: isAnimated,
     });
     const message = isFlex
       ? buildFlexImageMessage(upload)
@@ -1274,7 +1527,10 @@ async function sendToLine() {
 }
 
 function buildFlexImageMessage(upload) {
-  const flexImageUrl = upload.previewImageUrl || upload.originalContentUrl;
+  const isAnimated = Boolean(upload.animated);
+  const flexImageUrl = isAnimated
+    ? (upload.originalContentUrl || upload.previewImageUrl)
+    : (upload.previewImageUrl || upload.originalContentUrl);
   const aspectRatio = buildAspectRatio(upload.width || canvas.width, upload.height || canvas.height);
   return {
     type: "flex",
@@ -1288,6 +1544,7 @@ function buildFlexImageMessage(upload) {
         size: "full",
         aspectRatio,
         aspectMode: "fit",
+        animated: isAnimated,
         backgroundColor: "#00000000",
         action: {
           type: "uri",
@@ -1368,9 +1625,9 @@ async function saveToDriveTest() {
     setSaveTestDisabled(true);
     setStatus("Google Drive への保存テストを実行しています。", "info");
 
-    const exportCanvas = buildExportCanvas();
-    const blob = await canvasToBlob(exportCanvas);
-    const upload = await uploadToGas(blob);
+    const isAnimated = els.motionPreset.value !== "none";
+    const blob = isAnimated ? await buildAnimationBlob() : await canvasToBlob(buildExportCanvas());
+    const upload = await uploadToGasWithOptions(blob, { animated: isAnimated });
     setStatus(`保存テスト成功: ${upload.folderName} / ${upload.fileName}${upload.reused ? " を再利用" : ""}`, "success");
     refreshHistorySilently();
   } catch (error) {

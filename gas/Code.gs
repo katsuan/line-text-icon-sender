@@ -54,6 +54,7 @@ function doPost(e) {
     const keepHistory = payload.keepHistory !== false;
     const width = Math.max(1, Math.round(Number(payload.width) || 256));
     const height = Math.max(1, Math.round(Number(payload.height) || 256));
+    const animated = payload.animated === true;
 
     if (payload.action === 'delete') {
       const rootFolder = DriveApp.getFolderById(driveFolderId);
@@ -115,6 +116,7 @@ function doPost(e) {
       keepHistory: keepHistory,
       width: width,
       height: height,
+      animated: animated,
     });
     file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
 
@@ -144,6 +146,7 @@ function doPost(e) {
       createdAt: new Date().toISOString(),
       width: width,
       height: height,
+      animated: animated,
     });
   } catch (error) {
     return jsonResponse({
@@ -273,6 +276,7 @@ function collectHistoryItems_(folder, items) {
       sentMode: metadata.sentMode || '',
       width: Math.max(1, Math.round(Number(metadata.width) || 256)),
       height: Math.max(1, Math.round(Number(metadata.height) || 256)),
+      animated: metadata.animated === true,
     });
   }
 

@@ -90,11 +90,11 @@
           <div class="grid two sender-grid sender-size-row">
             <label class="field">
               <span>幅 (px)</span>
-              <input id="canvasWidth" type="number" min="32" max="2048" step="1" value="256" inputmode="numeric" />
+              <input id="canvasWidth" type="number" min="32" max="1024" step="1" value="256" inputmode="numeric" />
             </label>
             <label class="field">
               <span>高さ (px)</span>
-              <input id="canvasHeight" type="number" min="32" max="2048" step="1" value="256" inputmode="numeric" />
+              <input id="canvasHeight" type="number" min="32" max="1024" step="1" value="256" inputmode="numeric" />
             </label>
           </div>
           <div class="grid two sender-grid sender-size-row">
@@ -109,6 +109,25 @@
               <button class="preset-button size-preset-button" type="button" data-width="240" data-height="320">240×320</button>
             </div>
           </div>
+          <div class="grid two sender-grid sender-size-row">
+            <label class="field">
+              <span>動きプリセット</span>
+              <select id="motionPreset">
+                <option value="none" selected>なし</option>
+                <option value="xshake">横揺れ</option>
+                <option value="yshake">縦揺れ</option>
+                <option value="hop">ホップ</option>
+                <option value="zoom">ズーム</option>
+                <option value="flowRight">右へ流れる</option>
+                <option value="flowLeft">左へ流れる</option>
+              </select>
+            </label>
+            <label class="checkline">
+              <input id="motionWrapX" type="checkbox" />
+              <span>左右ラップ</span>
+            </label>
+          </div>
+          <p class="sender-help">送信時にアニメーションするAPNGとして書き出します。LINEのアニメーション画像は300KB以下、1024×1024px以下が上限です。超える場合はコマ数を自動で減らします。「左右ラップ」は右/左へ流れるプリセットで、画面端からはみ出た分を反対側にも描画して途切れなく見せます。</p>
           </section>
 
           <section class="style-panel" id="stylePanelText" role="tabpanel" aria-labelledby="styleTabText" data-style-panel="text" hidden>
