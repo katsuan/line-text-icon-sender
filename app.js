@@ -44,6 +44,7 @@ const els = {
   saveTest: document.getElementById("saveTest"),
   send: document.getElementById("send"),
   sendModeDialog: document.getElementById("sendModeDialog"),
+  sendModeAnimatedNote: document.getElementById("sendModeAnimatedNote"),
   deleteHistoryDialog: document.getElementById("deleteHistoryDialog"),
   refreshHistory: document.getElementById("refreshHistory"),
   historyEnabled: document.getElementById("historyEnabled"),
@@ -982,9 +983,18 @@ function supportsDialog() {
 }
 
 function chooseSendMode() {
+  const isAnimated = els.motionPreset.value !== "none";
+
   if (!supportsDialog()) {
-    const useFlex = window.confirm("Flex送信にしますか？\n「OK」でFlex送信、「キャンセル」で画像送信します。");
+    const animatedHint = isAnimated
+      ? "\n※動きプリセット(APNG)はFlex送信でのみ再生されます。画像送信では静止画になります。"
+      : "";
+    const useFlex = window.confirm(`Flex送信にしますか？\n「OK」でFlex送信、「キャンセル」で画像送信します。${animatedHint}`);
     return Promise.resolve(useFlex ? "flex" : "image");
+  }
+
+  if (els.sendModeAnimatedNote) {
+    els.sendModeAnimatedNote.hidden = !isAnimated;
   }
 
   return new Promise((resolve) => {
@@ -1144,6 +1154,7 @@ function canvasToBlob(exportCanvas) {
 const APNG_MAX_BYTES = 300 * 1024;
 const APNG_FRAME_DURATION_MS = 70;
 const APNG_FRAME_COUNTS = [12, 8, 6, 4];
+const APNG_COLOR_LEVELS = [256, 64, 32, 16, 8];
 
 const PNG_SIGNATURE = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
 const CRC32_TABLE = (() => {
@@ -1294,7 +1305,20 @@ function computeMotionTransform(presetName, t) {
   return {};
 }
 
-async function renderMotionFrameBlobs(frameCount) {
+function quantizeImageData(imageData, levels) {
+  if (levels >= 256) return imageData;
+  const step = 256 / levels;
+  const data = imageData.data;
+  for (let i = 0; i < data.length; i += 4) {
+    data[i] = Math.min(255, Math.round(data[i] / step) * step);
+    data[i + 1] = Math.min(255, Math.round(data[i + 1] / step) * step);
+    data[i + 2] = Math.min(255, Math.round(data[i + 2] / step) * step);
+    data[i + 3] = Math.min(255, Math.round(data[i + 3] / step) * step);
+  }
+  return imageData;
+}
+
+async function renderMotionFrameBlobs(frameCount, colorLevels = 256) {
   const presetName = els.motionPreset.value;
   const wrapX = els.motionWrapX.checked;
   const blobs = [];
@@ -1305,21 +1329,46 @@ async function renderMotionFrameBlobs(frameCount) {
     const frameCanvas = document.createElement("canvas");
     frameCanvas.width = canvas.width;
     frameCanvas.height = canvas.height;
-    renderToContext(frameCanvas.getContext("2d"), { transform: { ...transform, wrapX } });
+    const frameCtx = frameCanvas.getContext("2d");
+    renderToContext(frameCtx, { transform: { ...transform, wrapX } });
+    if (colorLevels < 256) {
+      const imageData = frameCtx.getImageData(0, 0, frameCanvas.width, frameCanvas.height);
+      quantizeImageData(imageData, colorLevels);
+      frameCtx.putImageData(imageData, 0, 0);
+    }
     blobs.push(await canvasToBlob(frameCanvas));
   }
   return blobs;
 }
 
 async function buildAnimationBlob() {
+  const fullFrameCount = APNG_FRAME_COUNTS[0];
   let lastBlob = null;
-  for (const frameCount of APNG_FRAME_COUNTS) {
-    const frameBlobs = await renderMotionFrameBlobs(frameCount);
+
+  // 1. まずコマ数はそのままに、色数(階調)を段階的に落として収める。
+  for (const levels of APNG_COLOR_LEVELS) {
+    const frameBlobs = await renderMotionFrameBlobs(fullFrameCount, levels);
     lastBlob = await buildApngBlob(frameBlobs, canvas.width, canvas.height, APNG_FRAME_DURATION_MS, 0);
     if (lastBlob.size <= APNG_MAX_BYTES) {
       return lastBlob;
     }
   }
+
+  // 2. 最大限色数を落としても収まらない場合のみ、最後の手段としてコマ数を減らす。
+  const minLevels = APNG_COLOR_LEVELS[APNG_COLOR_LEVELS.length - 1];
+  for (const frameCount of APNG_FRAME_COUNTS.slice(1)) {
+    const frameBlobs = await renderMotionFrameBlobs(frameCount, minLevels);
+    lastBlob = await buildApngBlob(frameBlobs, canvas.width, canvas.height, APNG_FRAME_DURATION_MS, 0);
+    if (lastBlob.size <= APNG_MAX_BYTES) {
+      return lastBlob;
+    }
+  }
+
+  const sizeKb = Math.ceil(lastBlob.size / 1024);
+  setStatus(
+    `色数・コマ数を最小まで減らしても${sizeKb}KBでLINEの300KB上限を超えています。LINEでは1フレーム目のみの静止画表示になります。テキストを短くするなどして収めてください。`,
+    "warn"
+  );
   return lastBlob;
 }
 
@@ -1518,7 +1567,8 @@ async function sendToLine() {
     }
 
     const isFlex = mode === "flex";
-    const isAnimated = els.motionPreset.value !== "none";
+    // LINEの通常画像メッセージはanimatedプロパティを持たないため、Flex以外ではアニメーションが再生されない。
+    const isAnimated = isFlex && els.motionPreset.value !== "none";
     setStatus(`Google Drive へ保存しています。${isFlex ? "Flex送信した画像は履歴に残り、あとから削除できません。" : ""}`, "info");
 
     const blob = isAnimated ? await buildAnimationBlob() : await canvasToBlob(buildExportCanvas());
@@ -1588,8 +1638,18 @@ function buildFlexImageMessage(upload) {
       body: {
         type: "box",
         layout: "vertical",
-        contents: [],
-        paddingAll: "0px",
+        contents: isAnimated
+          ? [
+              {
+                type: "text",
+                text: "※ご利用の端末や文字内容によっては、アニメーションが再生されず静止画で表示される場合があります。",
+                size: "xxs",
+                color: "#999999",
+                wrap: true,
+              },
+            ]
+          : [],
+        paddingAll: isAnimated ? "12px" : "0px",
         spacing: "none",
         backgroundColor: "#00000000",
       },

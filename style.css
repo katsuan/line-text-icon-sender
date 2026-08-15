@@ -1035,6 +1035,14 @@ canvas {
   color: var(--line);
 }
 
+.send-mode-animated-note {
+  color: #9a6400;
+  font-size: 0.88rem;
+  line-height: 1.6;
+  padding-top: 4px;
+  border-top: 1px dashed rgba(154, 100, 0, 0.3);
+}
+
 .send-mode-actions {
   display: grid;
   gap: 10px;
