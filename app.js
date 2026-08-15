@@ -39,6 +39,7 @@ const els = {
   outlineWidthValue: document.getElementById("outlineWidthValue"),
   motionPreset: document.getElementById("motionPreset"),
   motionWrapX: document.getElementById("motionWrapX"),
+  flexBubbleSize: document.getElementById("flexBubbleSize"),
   download: document.getElementById("download"),
   saveTest: document.getElementById("saveTest"),
   send: document.getElementById("send"),
@@ -455,6 +456,28 @@ sizePresetButtons.forEach((button) => {
   });
 });
 
+const motionPresetButtons = Array.from(document.querySelectorAll(".motion-preset-button"));
+motionPresetButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    els.motionPreset.value = button.dataset.motionPreset;
+    motionPresetButtons.forEach((other) => {
+      other.classList.toggle("is-active", other === button);
+    });
+    generate();
+  });
+});
+
+const flexSizeButtons = Array.from(document.querySelectorAll(".flex-size-button"));
+flexSizeButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    els.flexBubbleSize.value = button.dataset.flexSize;
+    flexSizeButtons.forEach((other) => {
+      other.classList.toggle("is-active", other === button);
+    });
+    generate();
+  });
+});
+
 function gcd(a, b) {
   return b === 0 ? a : gcd(b, a % b);
 }
@@ -609,6 +632,7 @@ function collectStyleSettings() {
     lockSquare: lockSquareInput.checked,
     motionPreset: els.motionPreset.value,
     motionWrapX: els.motionWrapX.checked,
+    flexBubbleSize: els.flexBubbleSize.value,
   };
 }
 
@@ -679,9 +703,18 @@ function applyStyleSettings(settings) {
   }
   if (settings.motionPreset) {
     els.motionPreset.value = settings.motionPreset;
+    motionPresetButtons.forEach((button) => {
+      button.classList.toggle("is-active", button.dataset.motionPreset === settings.motionPreset);
+    });
   }
   if (typeof settings.motionWrapX === "boolean") {
     els.motionWrapX.checked = settings.motionWrapX;
+  }
+  if (settings.flexBubbleSize) {
+    els.flexBubbleSize.value = settings.flexBubbleSize;
+    flexSizeButtons.forEach((button) => {
+      button.classList.toggle("is-active", button.dataset.flexSize === settings.flexBubbleSize);
+    });
   }
 
   return true;
@@ -1537,7 +1570,7 @@ function buildFlexImageMessage(upload) {
     altText: `${els.text.value || "画像"} - 💬TextIconSender`,
     contents: {
       type: "bubble",
-      size: "giga",
+      size: els.flexBubbleSize.value || "giga",
       hero: {
         type: "image",
         url: flexImageUrl,

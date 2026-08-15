@@ -109,25 +109,36 @@
               <button class="preset-button size-preset-button" type="button" data-width="240" data-height="320">240×320</button>
             </div>
           </div>
-          <div class="grid two sender-grid sender-size-row">
-            <label class="field">
-              <span>動きプリセット</span>
-              <select id="motionPreset">
-                <option value="none" selected>なし</option>
-                <option value="xshake">横揺れ</option>
-                <option value="yshake">縦揺れ</option>
-                <option value="hop">ホップ</option>
-                <option value="zoom">ズーム</option>
-                <option value="flowRight">右へ流れる</option>
-                <option value="flowLeft">左へ流れる</option>
-              </select>
-            </label>
-            <label class="checkline">
-              <input id="motionWrapX" type="checkbox" />
-              <span>左右ラップ</span>
-            </label>
-          </div>
+          <section class="field">
+            <span>動きプリセット</span>
+            <div class="preset-row" aria-label="動きプリセット">
+              <button class="preset-button motion-preset-button is-active" type="button" data-motion-preset="none">なし</button>
+              <button class="preset-button motion-preset-button" type="button" data-motion-preset="xshake">横揺れ</button>
+              <button class="preset-button motion-preset-button" type="button" data-motion-preset="yshake">縦揺れ</button>
+              <button class="preset-button motion-preset-button" type="button" data-motion-preset="hop">ホップ</button>
+              <button class="preset-button motion-preset-button" type="button" data-motion-preset="zoom">ズーム</button>
+              <button class="preset-button motion-preset-button" type="button" data-motion-preset="flowRight">右へ流れる</button>
+              <button class="preset-button motion-preset-button" type="button" data-motion-preset="flowLeft">左へ流れる</button>
+            </div>
+            <input id="motionPreset" type="hidden" value="none" />
+          </section>
+          <label class="checkline">
+            <input id="motionWrapX" type="checkbox" />
+            <span>左右ラップ</span>
+          </label>
           <p class="sender-help">送信時にアニメーションするAPNGとして書き出します。LINEのアニメーション画像は300KB以下、1024×1024px以下が上限です。超える場合はコマ数を自動で減らします。「左右ラップ」は右/左へ流れるプリセットで、画面端からはみ出た分を反対側にも描画して途切れなく見せます。</p>
+          <section class="field">
+            <span>Flexバブルサイズ</span>
+            <div class="preset-row" aria-label="Flexバブルサイズ">
+              <button class="preset-button flex-size-button" type="button" data-flex-size="nano">nano</button>
+              <button class="preset-button flex-size-button" type="button" data-flex-size="micro">micro</button>
+              <button class="preset-button flex-size-button" type="button" data-flex-size="kilo">kilo</button>
+              <button class="preset-button flex-size-button" type="button" data-flex-size="mega">mega</button>
+              <button class="preset-button flex-size-button is-active" type="button" data-flex-size="giga">giga</button>
+            </div>
+            <input id="flexBubbleSize" type="hidden" value="giga" />
+          </section>
+          <p class="sender-help">Flex送信時のバブル(カード)の大きさです。トークリスト上の表示サイズに影響します。迷ったら giga のままで問題ありません。</p>
           </section>
 
           <section class="style-panel" id="stylePanelText" role="tabpanel" aria-labelledby="styleTabText" data-style-panel="text" hidden>
