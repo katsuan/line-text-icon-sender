@@ -1615,9 +1615,10 @@ function buildFlexImageMessage(upload) {
     ? (upload.originalContentUrl || upload.previewImageUrl)
     : (upload.previewImageUrl || upload.originalContentUrl);
   const aspectRatio = buildAspectRatio(upload.width || canvas.width, upload.height || canvas.height);
+  const sourceText = (upload.text ?? els.text.value ?? "").replace(/\r?\n/g, " ").trim();
   return {
     type: "flex",
-    altText: `${els.text.value || "画像"} - 💬TextIconSender`,
+    altText: `${sourceText || "画像"} - 💬TextIconSender`,
     contents: {
       type: "bubble",
       size: els.flexBubbleSize.value || "giga",
@@ -1642,7 +1643,14 @@ function buildFlexImageMessage(upload) {
           ? [
               {
                 type: "text",
-                text: "※ご利用の端末や内容によっては、アニメーション画像が再生されない場合があります。",
+              text: `「${sourceText || "(未入力)"}」を動く画像で送信しました。`,
+                size: "xxs",
+                color: "#999999",
+                wrap: true,
+              },
+              {
+                type: "text",
+                text: "※ご利用端末によっては、動く画像が取得されない場合があります。",
                 size: "xxs",
                 color: "#999999",
                 wrap: true,
