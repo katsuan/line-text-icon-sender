@@ -1067,12 +1067,57 @@ canvas {
   display: block;
 }
 
+.flex-confirm-body-preview {
+  display: grid;
+  gap: 4px;
+  padding: 10px 14px;
+  border: 1.5px dashed rgba(31, 31, 31, 0.16);
+  border-radius: 14px;
+  background: rgba(247, 243, 235, 0.6);
+}
+
+.flex-confirm-body-preview p {
+  color: #999999;
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.flex-confirm-accordion {
+  border: 1.5px solid rgba(31, 31, 31, 0.12);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.flex-confirm-accordion summary {
+  cursor: pointer;
+  padding: 10px 14px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--muted);
+  list-style: none;
+}
+
+.flex-confirm-accordion summary::-webkit-details-marker {
+  display: none;
+}
+
+.flex-confirm-accordion summary::before {
+  content: "▸ ";
+}
+
+.flex-confirm-accordion[open] summary::before {
+  content: "▾ ";
+}
+
+.flex-confirm-accordion:not([open]) .flex-confirm-note-toggles {
+  display: none;
+}
+
 .flex-confirm-note-toggles {
   display: grid;
   gap: 8px;
   padding: 12px 14px;
-  border: 1.5px solid rgba(154, 100, 0, 0.25);
-  border-radius: 16px;
+  border-top: 1.5px solid rgba(154, 100, 0, 0.25);
   background: rgba(255, 247, 224, 0.6);
 }
 

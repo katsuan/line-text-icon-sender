@@ -80,7 +80,7 @@
               <button class="style-tab is-active" id="styleTabColor" type="button" role="tab" aria-selected="true" aria-controls="stylePanelColor" data-style-tab="color">色</button>
               <button class="style-tab" id="styleTabText" type="button" role="tab" aria-selected="false" aria-controls="stylePanelText" data-style-tab="text">文字</button>
               <button class="style-tab" id="styleTabSize" type="button" role="tab" aria-selected="false" aria-controls="stylePanelSize" data-style-tab="size">サイズ</button>
-              <button class="style-tab" id="styleTabMotion" type="button" role="tab" aria-selected="false" aria-controls="stylePanelMotion" data-style-tab="motion">動き</button>
+              <button class="style-tab" id="styleTabFlex" type="button" role="tab" aria-selected="false" aria-controls="stylePanelFlex" data-style-tab="flex">Flex</button>
             </div>
           </div>
           </div>
@@ -113,8 +113,8 @@
           </div>
           </section>
 
-          <section class="style-panel" id="stylePanelMotion" role="tabpanel" aria-labelledby="styleTabMotion" data-style-panel="motion" hidden>
-          <p class="sender-help">⚠️ 動きプリセットは<strong>Flex送信でのみ</strong>アニメーションします。画像送信では静止画(1コマ目)になります。</p>
+          <section class="style-panel" id="stylePanelFlex" role="tabpanel" aria-labelledby="styleTabFlex" data-style-panel="flex" hidden>
+          <p class="sender-help">⚠️ ここの設定は<strong>Flex送信でのみ</strong>反映されます。画像送信では動きプリセットは静止画(1コマ目)、バブルサイズは無関係になります。</p>
           <section class="field">
             <span>動きプリセット</span>
             <div class="preset-row" aria-label="動きプリセット">
@@ -133,6 +133,25 @@
             <span>左右ラップ</span>
           </label>
           <p class="sender-help">送信時にアニメーションするAPNGとして書き出します。LINEのアニメーション画像は300KB以下、1024×1024px以下が上限です。容量超過の場合は色数・コマ数を自動で減らします。「左右ラップ」は右/左へ流れるプリセットで、画面端からはみ出た分を反対側にも描画して途切れなく見せます。</p>
+          <section class="field">
+            <span>Flexバブルサイズ</span>
+            <div class="preset-row" aria-label="Flexバブルサイズ">
+              <button class="preset-button flex-size-button" type="button" data-flex-size="nano">nano</button>
+              <button class="preset-button flex-size-button" type="button" data-flex-size="micro">micro</button>
+              <button class="preset-button flex-size-button" type="button" data-flex-size="kilo">kilo</button>
+              <button class="preset-button flex-size-button" type="button" data-flex-size="mega">mega</button>
+              <button class="preset-button flex-size-button is-active" type="button" data-flex-size="giga">giga</button>
+            </div>
+          </section>
+          <p class="sender-help">Flex送信時のバブル(カード)の大きさです。トークリスト上の表示サイズに影響します。迷ったら giga のままで問題ありません。送信確認画面でも変更できます。</p>
+          <label class="checkline">
+            <input id="flexIncludeLiffLink" type="checkbox" checked />
+            <span>画像タップでこのページを開けるようにする</span>
+          </label>
+          <label class="checkline">
+            <input id="flexIncludeAltTextSuffix" type="checkbox" checked />
+            <span>通知テキストに「💬TextIconSender」を付与する</span>
+          </label>
           </section>
 
           <section class="style-panel" id="stylePanelText" role="tabpanel" aria-labelledby="styleTabText" data-style-panel="text" hidden>
@@ -344,6 +363,7 @@
         <div class="flex-confirm-preview">
           <img id="flexConfirmPreviewImg" alt="送信プレビュー" />
         </div>
+        <div id="flexConfirmBodyPreview" class="flex-confirm-body-preview" hidden></div>
         <section class="field">
           <span>Flexバブルサイズ</span>
           <div class="preset-row" aria-label="Flexバブルサイズ(送信確認)">
@@ -355,17 +375,22 @@
           </div>
           <input id="flexBubbleSize" type="hidden" value="giga" />
         </section>
-        <div id="flexConfirmNoteToggles" class="flex-confirm-note-toggles" hidden>
-          <p id="flexConfirmAnimatedNote" class="send-mode-animated-note">⚠️ 動きプリセット(APNG)はFlex送信でのみアニメーションします。ご利用端末によっては、動く画像が取得されない場合があります。</p>
-          <label class="checkline">
-            <input id="flexIncludeTextNote" type="checkbox" checked />
-            <span>送信テキストをカードに記載する <em>(推奨)</em></span>
-          </label>
-          <label class="checkline">
-            <input id="flexIncludeCaveatNote" type="checkbox" checked />
-            <span>動かない場合がある旨の注意書きを記載する <em>(推奨)</em></span>
-          </label>
-        </div>
+        <details id="flexConfirmNoteToggles" class="flex-confirm-accordion">
+          <summary>推奨設定を確認・変更する</summary>
+          <div class="flex-confirm-note-toggles">
+            <label class="checkline">
+              <input id="flexIncludeTextNote" type="checkbox" checked />
+              <span>送信テキストをカードに記載する <em>(推奨)</em></span>
+            </label>
+            <div id="flexConfirmAnimatedOnly" hidden>
+              <p id="flexConfirmAnimatedNote" class="send-mode-animated-note">⚠️ 動きプリセット(APNG)はFlex送信でのみアニメーションします。ご利用端末によっては、動く画像が取得されない場合があります。</p>
+              <label class="checkline">
+                <input id="flexIncludeCaveatNote" type="checkbox" checked />
+                <span>動かない場合がある旨の注意書きを記載する <em>(推奨)</em></span>
+              </label>
+            </div>
+          </div>
+        </details>
         <div class="send-mode-actions">
           <button class="secondary-action send-mode-button" type="button" value="cancel" data-flex-confirm="cancel">キャンセル</button>
           <button class="secondary-action send-mode-button" type="button" value="confirm" data-flex-confirm="confirm">この内容で送信</button>

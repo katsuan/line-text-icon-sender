@@ -49,8 +49,12 @@ const els = {
   flexConfirmPreviewImg: document.getElementById("flexConfirmPreviewImg"),
   flexConfirmAnimatedNote: document.getElementById("flexConfirmAnimatedNote"),
   flexConfirmNoteToggles: document.getElementById("flexConfirmNoteToggles"),
+  flexConfirmAnimatedOnly: document.getElementById("flexConfirmAnimatedOnly"),
+  flexConfirmBodyPreview: document.getElementById("flexConfirmBodyPreview"),
   flexIncludeTextNote: document.getElementById("flexIncludeTextNote"),
   flexIncludeCaveatNote: document.getElementById("flexIncludeCaveatNote"),
+  flexIncludeLiffLink: document.getElementById("flexIncludeLiffLink"),
+  flexIncludeAltTextSuffix: document.getElementById("flexIncludeAltTextSuffix"),
   deleteHistoryDialog: document.getElementById("deleteHistoryDialog"),
   deleteFlexWarning: document.getElementById("deleteFlexWarning"),
   refreshHistory: document.getElementById("refreshHistory"),
@@ -641,6 +645,8 @@ function collectStyleSettings() {
     motionPreset: els.motionPreset.value,
     motionWrapX: els.motionWrapX.checked,
     flexBubbleSize: els.flexBubbleSize.value,
+    flexIncludeLiffLink: els.flexIncludeLiffLink.checked,
+    flexIncludeAltTextSuffix: els.flexIncludeAltTextSuffix.checked,
   };
 }
 
@@ -723,6 +729,12 @@ function applyStyleSettings(settings) {
     flexSizeButtons.forEach((button) => {
       button.classList.toggle("is-active", button.dataset.flexSize === settings.flexBubbleSize);
     });
+  }
+  if (typeof settings.flexIncludeLiffLink === "boolean") {
+    els.flexIncludeLiffLink.checked = settings.flexIncludeLiffLink;
+  }
+  if (typeof settings.flexIncludeAltTextSuffix === "boolean") {
+    els.flexIncludeAltTextSuffix.checked = settings.flexIncludeAltTextSuffix;
   }
 
   return true;
@@ -1040,13 +1052,36 @@ function chooseSendMode() {
   });
 }
 
-function confirmFlexSend(previewSrc, isAnimated) {
+function renderFlexConfirmBodyPreview(isAnimated, sourceText) {
+  if (!els.flexConfirmBodyPreview) return;
+  const lines = buildFlexNoteLines(isAnimated, sourceText);
+  if (!lines.length) {
+    els.flexConfirmBodyPreview.hidden = true;
+    els.flexConfirmBodyPreview.innerHTML = "";
+    return;
+  }
+  els.flexConfirmBodyPreview.hidden = false;
+  els.flexConfirmBodyPreview.innerHTML = lines.map((line) => `<p>${escapeHtml(line)}</p>`).join("");
+}
+
+let flexConfirmNoteToggleHandler = null;
+
+function confirmFlexSend(previewSrc, isAnimated, sourceText = "") {
   if (els.flexConfirmPreviewImg && previewSrc) {
     els.flexConfirmPreviewImg.src = previewSrc;
   }
-  if (els.flexConfirmNoteToggles) {
-    els.flexConfirmNoteToggles.hidden = !isAnimated;
+  if (els.flexConfirmAnimatedOnly) {
+    els.flexConfirmAnimatedOnly.hidden = !isAnimated;
   }
+  renderFlexConfirmBodyPreview(isAnimated, sourceText);
+
+  if (flexConfirmNoteToggleHandler) {
+    els.flexIncludeTextNote?.removeEventListener("input", flexConfirmNoteToggleHandler);
+    els.flexIncludeCaveatNote?.removeEventListener("input", flexConfirmNoteToggleHandler);
+  }
+  flexConfirmNoteToggleHandler = () => renderFlexConfirmBodyPreview(isAnimated, sourceText);
+  els.flexIncludeTextNote?.addEventListener("input", flexConfirmNoteToggleHandler);
+  els.flexIncludeCaveatNote?.addEventListener("input", flexConfirmNoteToggleHandler);
 
   if (!(typeof HTMLDialogElement !== "undefined" && els.flexConfirmDialog instanceof HTMLDialogElement)) {
     return Promise.resolve(window.confirm("プレビュー画像に説明文を添えたカード形式でFlex送信します。よろしいですか？"));
@@ -1632,7 +1667,8 @@ async function sendToLine() {
     const isAnimated = isFlex && els.motionPreset.value !== "none";
 
     if (isFlex) {
-      const confirmed = await confirmFlexSend(buildExportCanvas().toDataURL("image/png"), isAnimated);
+      const confirmSourceText = (els.text.value || "").replace(/\r?\n/g, " ").trim();
+      const confirmed = await confirmFlexSend(buildExportCanvas().toDataURL("image/png"), isAnimated, confirmSourceText);
       if (!confirmed) {
         setStatus("送信はキャンセルされました。", "warn");
         return;
@@ -1679,28 +1715,26 @@ async function sendToLine() {
   }
 }
 
-function buildFlexBodyNotes(isAnimated, sourceText) {
-  if (!isAnimated) return [];
-  const notes = [];
+function buildFlexNoteLines(isAnimated, sourceText) {
+  const lines = [];
   if (els.flexIncludeTextNote?.checked !== false) {
-    notes.push({
-      type: "text",
-      text: `「${sourceText || "(未入力)"}」を動く画像で送信しました。`,
-      size: "xxs",
-      color: "#999999",
-      wrap: true,
-    });
+    const suffix = isAnimated ? "を動く画像で送信しました。" : "を送信しました。";
+    lines.push(`「${sourceText || "(未入力)"}」${suffix}`);
   }
-  if (els.flexIncludeCaveatNote?.checked !== false) {
-    notes.push({
-      type: "text",
-      text: "※ご利用端末によっては、動く画像が取得されない場合があります。",
-      size: "xxs",
-      color: "#999999",
-      wrap: true,
-    });
+  if (isAnimated && els.flexIncludeCaveatNote?.checked !== false) {
+    lines.push("※ご利用端末によっては、動く画像が取得されない場合があります。");
   }
-  return notes;
+  return lines;
+}
+
+function buildFlexBodyNotes(isAnimated, sourceText) {
+  return buildFlexNoteLines(isAnimated, sourceText).map((text) => ({
+    type: "text",
+    text,
+    size: "xxs",
+    color: "#999999",
+    wrap: true,
+  }));
 }
 
 function buildFlexImageMessage(upload) {
@@ -1711,9 +1745,12 @@ function buildFlexImageMessage(upload) {
   const aspectRatio = buildAspectRatio(upload.width || canvas.width, upload.height || canvas.height);
   const sourceText = (upload.text ?? els.text.value ?? "").replace(/\r?\n/g, " ").trim();
   const bodyNotes = buildFlexBodyNotes(isAnimated, sourceText);
+  const includeLiffLink = els.flexIncludeLiffLink?.checked !== false;
+  const includeAltTextSuffix = els.flexIncludeAltTextSuffix?.checked !== false;
+  const altText = includeAltTextSuffix ? `${sourceText || "画像"} - 💬TextIconSender` : (sourceText || "画像");
   return {
     type: "flex",
-    altText: `${sourceText || "画像"} - 💬TextIconSender`,
+    altText,
     contents: {
       type: "bubble",
       size: els.flexBubbleSize.value || "giga",
@@ -1725,11 +1762,15 @@ function buildFlexImageMessage(upload) {
         aspectMode: "fit",
         animated: isAnimated,
         backgroundColor: "#00000000",
-        action: {
-          type: "uri",
-          label: "TextIconSender を開く",
-          uri: getLiffShareUrl(),
-        },
+        ...(includeLiffLink
+          ? {
+              action: {
+                type: "uri",
+                label: "TextIconSender を開く",
+                uri: getLiffShareUrl(),
+              },
+            }
+          : {}),
       },
       body: {
         type: "box",
@@ -1766,7 +1807,8 @@ async function sendHistoryItem(item) {
     const isFlex = mode === "flex";
 
     if (isFlex) {
-      const confirmed = await confirmFlexSend(item.previewImageUrl || item.originalContentUrl, Boolean(item.animated));
+      const confirmSourceText = (item.text || els.text.value || "").replace(/\r?\n/g, " ").trim();
+      const confirmed = await confirmFlexSend(item.previewImageUrl || item.originalContentUrl, Boolean(item.animated), confirmSourceText);
       if (!confirmed) {
         setStatus("送信はキャンセルされました。", "warn");
         return;
