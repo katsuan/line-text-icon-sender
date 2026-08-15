@@ -41,6 +41,7 @@
           </div>
           <span id="historySummary">履歴を保存・送信できます</span>
         </div>
+        <p class="sender-help"><strong>Flex送信</strong>した画像は、履歴保存設定に関わらず履歴に残り続けます。</p>
         <div id="historyBody" class="section-toggle-body">
           <div id="historyList" class="history-list" aria-live="polite">
             <p class="sender-help">履歴を開くと読み込みます。</p>
@@ -76,9 +77,10 @@
             <h2>Style</h2>
             <div class="style-tabs-wrap">
             <div class="style-tabs" role="tablist" aria-label="スタイルカテゴリ">
-              <button class="style-tab is-active" id="styleTabColor" type="button" role="tab" aria-selected="true" aria-controls="stylePanelColor" data-style-tab="color">色・枠</button>
+              <button class="style-tab is-active" id="styleTabColor" type="button" role="tab" aria-selected="true" aria-controls="stylePanelColor" data-style-tab="color">色</button>
               <button class="style-tab" id="styleTabText" type="button" role="tab" aria-selected="false" aria-controls="stylePanelText" data-style-tab="text">文字</button>
               <button class="style-tab" id="styleTabSize" type="button" role="tab" aria-selected="false" aria-controls="stylePanelSize" data-style-tab="size">サイズ</button>
+              <button class="style-tab" id="styleTabMotion" type="button" role="tab" aria-selected="false" aria-controls="stylePanelMotion" data-style-tab="motion">動き</button>
             </div>
           </div>
           </div>
@@ -109,6 +111,10 @@
               <button class="preset-button size-preset-button" type="button" data-width="240" data-height="320">240×320</button>
             </div>
           </div>
+          </section>
+
+          <section class="style-panel" id="stylePanelMotion" role="tabpanel" aria-labelledby="styleTabMotion" data-style-panel="motion" hidden>
+          <p class="sender-help">⚠️ 動きプリセットは<strong>Flex送信でのみ</strong>アニメーションします。画像送信では静止画(1コマ目)になります。</p>
           <section class="field">
             <span>動きプリセット</span>
             <div class="preset-row" aria-label="動きプリセット">
@@ -126,19 +132,7 @@
             <input id="motionWrapX" type="checkbox" />
             <span>左右ラップ</span>
           </label>
-          <p class="sender-help">送信時にアニメーションするAPNGとして書き出します。LINEのアニメーション画像は300KB以下、1024×1024px以下が上限です。超える場合はコマ数を自動で減らします。「左右ラップ」は右/左へ流れるプリセットで、画面端からはみ出た分を反対側にも描画して途切れなく見せます。</p>
-          <section class="field">
-            <span>Flexバブルサイズ</span>
-            <div class="preset-row" aria-label="Flexバブルサイズ">
-              <button class="preset-button flex-size-button" type="button" data-flex-size="nano">nano</button>
-              <button class="preset-button flex-size-button" type="button" data-flex-size="micro">micro</button>
-              <button class="preset-button flex-size-button" type="button" data-flex-size="kilo">kilo</button>
-              <button class="preset-button flex-size-button" type="button" data-flex-size="mega">mega</button>
-              <button class="preset-button flex-size-button is-active" type="button" data-flex-size="giga">giga</button>
-            </div>
-            <input id="flexBubbleSize" type="hidden" value="giga" />
-          </section>
-          <p class="sender-help">Flex送信時のバブル(カード)の大きさです。トークリスト上の表示サイズに影響します。迷ったら giga のままで問題ありません。</p>
+          <p class="sender-help">送信時にアニメーションするAPNGとして書き出します。LINEのアニメーション画像は300KB以下、1024×1024px以下が上限です。容量超過の場合は色数・コマ数を自動で減らします。「左右ラップ」は右/左へ流れるプリセットで、画面端からはみ出た分を反対側にも描画して途切れなく見せます。</p>
           </section>
 
           <section class="style-panel" id="stylePanelText" role="tabpanel" aria-labelledby="styleTabText" data-style-panel="text" hidden>
@@ -244,7 +238,7 @@
 
           <div class="grid two sender-grid sender-outline-row">
             <section class="field sender-toggle-group">
-              <span>枠線</span>
+              <span>文字の枠線</span>
               <label class="checkline">
                 <input id="outlineEnabled" type="checkbox" checked />
                 <span>枠を表示する</span>
@@ -332,7 +326,7 @@
         <p class="send-mode-copy">送信先の選択前に、送信方法を選んでください。</p>
         <div class="send-mode-notes">
           <p><strong>画像送信</strong> そのまま画像として送ります。透明背景も見え方を保ちやすいです。</p>
-          <p><strong>Flex送信</strong> 画像をタップするとこのページを開けます。トーク上ではカード表示になるため、透明背景色でも白っぽい背景つきに見えることがあります。送信後は履歴に残り、削除できません。</p>
+          <p><strong>Flex送信</strong> 画像をタップするとこのページを開けます。トーク上ではカード表示になるため、透明背景色でも白っぽい背景つきに見えることがあります。送信後は履歴に残ります。削除はできますが、元に戻せず送信済みのメッセージも見れなくなります。</p>
           <p id="sendModeAnimatedNote" class="send-mode-animated-note" hidden>⚠️ 動きプリセット(APNG)は<strong>Flex送信でのみ</strong>アニメーションします。画像送信では静止画(1コマ目)になります。</p>
         </div>
         <div class="send-mode-actions">
@@ -343,13 +337,49 @@
       </form>
     </dialog>
 
+    <dialog id="flexConfirmDialog" class="send-mode-dialog">
+      <form method="dialog" class="send-mode-card">
+        <p class="send-mode-title">Flex送信の確認</p>
+        <p class="send-mode-copy">下のプレビュー画像をカード形式で送信します。バブルサイズはここでも変更できます。</p>
+        <div class="flex-confirm-preview">
+          <img id="flexConfirmPreviewImg" alt="送信プレビュー" />
+        </div>
+        <section class="field">
+          <span>Flexバブルサイズ</span>
+          <div class="preset-row" aria-label="Flexバブルサイズ(送信確認)">
+            <button class="preset-button flex-size-button" type="button" data-flex-size="nano">nano</button>
+            <button class="preset-button flex-size-button" type="button" data-flex-size="micro">micro</button>
+            <button class="preset-button flex-size-button" type="button" data-flex-size="kilo">kilo</button>
+            <button class="preset-button flex-size-button" type="button" data-flex-size="mega">mega</button>
+            <button class="preset-button flex-size-button is-active" type="button" data-flex-size="giga">giga</button>
+          </div>
+          <input id="flexBubbleSize" type="hidden" value="giga" />
+        </section>
+        <div id="flexConfirmNoteToggles" class="flex-confirm-note-toggles" hidden>
+          <p id="flexConfirmAnimatedNote" class="send-mode-animated-note">⚠️ 動きプリセット(APNG)はFlex送信でのみアニメーションします。ご利用端末によっては、動く画像が取得されない場合があります。</p>
+          <label class="checkline">
+            <input id="flexIncludeTextNote" type="checkbox" checked />
+            <span>送信テキストをカードに記載する <em>(推奨)</em></span>
+          </label>
+          <label class="checkline">
+            <input id="flexIncludeCaveatNote" type="checkbox" checked />
+            <span>動かない場合がある旨の注意書きを記載する <em>(推奨)</em></span>
+          </label>
+        </div>
+        <div class="send-mode-actions">
+          <button class="secondary-action send-mode-button" type="button" value="cancel" data-flex-confirm="cancel">キャンセル</button>
+          <button class="secondary-action send-mode-button" type="button" value="confirm" data-flex-confirm="confirm">この内容で送信</button>
+        </div>
+      </form>
+    </dialog>
+
     <dialog id="deleteHistoryDialog" class="send-mode-dialog">
       <form method="dialog" class="send-mode-card">
         <p class="send-mode-title">履歴を削除する</p>
-        <p class="send-mode-copy">履歴画像の削除を実施します。</p>
-        <div class="send-mode-notes">
-          <p><strong>Flex送信</strong> は、画像をタップするとこのページを開ける送信方法です。</p>
-          <p>削除した画像を使った Flex送信メッセージは、あとから開けなくなったり表示が崩れたりすることがあります。</p>
+        <p class="send-mode-copy">この画像を削除します。<strong>削除すると元に戻せません。</strong></p>
+        <div id="deleteFlexWarning" class="send-mode-notes" hidden>
+          <p>⚠️ この画像は<strong>Flex送信済み</strong>です。</p>
+          <p>削除すると、<strong>送信済みのFlexメッセージの画像が表示・再生できなくなります</strong>(タップしてもこのページを開けなくなります)。この操作は<strong>取り消せません</strong>。</p>
         </div>
         <div class="send-mode-actions">
           <button class="secondary-action send-mode-button send-mode-danger" type="button" value="delete" data-delete-confirm="delete">削除する</button>

@@ -64,15 +64,13 @@ function doPost(e) {
         throw new Error('削除対象の画像が見つかりません。');
       }
       const metadata = parseMetadata_(file.getDescription());
-      if (metadata.flexLocked === true) {
-        throw new Error('Flex送信済みの画像は削除できません。');
-      }
       file.setTrashed(true);
       return jsonResponse({
         ok: true,
         action: 'delete',
         fileId: file.getId(),
         userKey: userKey,
+        flexLocked: metadata.flexLocked === true,
       });
     }
 

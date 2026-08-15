@@ -45,7 +45,14 @@ const els = {
   send: document.getElementById("send"),
   sendModeDialog: document.getElementById("sendModeDialog"),
   sendModeAnimatedNote: document.getElementById("sendModeAnimatedNote"),
+  flexConfirmDialog: document.getElementById("flexConfirmDialog"),
+  flexConfirmPreviewImg: document.getElementById("flexConfirmPreviewImg"),
+  flexConfirmAnimatedNote: document.getElementById("flexConfirmAnimatedNote"),
+  flexConfirmNoteToggles: document.getElementById("flexConfirmNoteToggles"),
+  flexIncludeTextNote: document.getElementById("flexIncludeTextNote"),
+  flexIncludeCaveatNote: document.getElementById("flexIncludeCaveatNote"),
   deleteHistoryDialog: document.getElementById("deleteHistoryDialog"),
+  deleteFlexWarning: document.getElementById("deleteFlexWarning"),
   refreshHistory: document.getElementById("refreshHistory"),
   historyEnabled: document.getElementById("historyEnabled"),
   historyList: document.getElementById("historyList"),
@@ -473,7 +480,7 @@ flexSizeButtons.forEach((button) => {
   button.addEventListener("click", () => {
     els.flexBubbleSize.value = button.dataset.flexSize;
     flexSizeButtons.forEach((other) => {
-      other.classList.toggle("is-active", other === button);
+      other.classList.toggle("is-active", other.dataset.flexSize === button.dataset.flexSize);
     });
     generate();
   });
@@ -882,7 +889,7 @@ function renderHistoryList(items) {
         <div class="history-meta">
           <div class="history-sub-row">
             <div class="history-sub">${escapeHtml(sub)}</div>
-            ${item.flexLocked ? '<span class="history-lock-note">削除不可</span>' : `<button class="secondary-action history-delete-pill" type="button" data-history-delete="${index}">削除</button>`}
+            <button class="secondary-action history-delete-pill" type="button" data-history-delete="${index}">削除</button>
           </div>
         </div>
         <div class="history-controls">
@@ -924,7 +931,7 @@ function renderHistoryList(items) {
       const index = Number(button.dataset.historyDelete);
       const item = state.historyItems[index];
       if (!item) return;
-      const confirmed = await confirmDeleteHistoryItem();
+      const confirmed = await confirmDeleteHistoryItem(Boolean(item.flexLocked));
       if (!confirmed) return;
       button.disabled = true;
       try {
@@ -1033,9 +1040,63 @@ function chooseSendMode() {
   });
 }
 
-function confirmDeleteHistoryItem() {
+function confirmFlexSend(previewSrc, isAnimated) {
+  if (els.flexConfirmPreviewImg && previewSrc) {
+    els.flexConfirmPreviewImg.src = previewSrc;
+  }
+  if (els.flexConfirmNoteToggles) {
+    els.flexConfirmNoteToggles.hidden = !isAnimated;
+  }
+
+  if (!(typeof HTMLDialogElement !== "undefined" && els.flexConfirmDialog instanceof HTMLDialogElement)) {
+    return Promise.resolve(window.confirm("プレビュー画像に説明文を添えたカード形式でFlex送信します。よろしいですか？"));
+  }
+
+  return new Promise((resolve) => {
+    const dialog = els.flexConfirmDialog;
+    const buttons = Array.from(dialog.querySelectorAll("[data-flex-confirm]"));
+
+    const cleanup = () => {
+      buttons.forEach((button) => button.removeEventListener("click", onClick));
+      dialog.removeEventListener("cancel", onCancel);
+      dialog.removeEventListener("close", onClose);
+    };
+
+    const finish = (confirmed) => {
+      cleanup();
+      resolve(confirmed);
+    };
+
+    const onClick = (event) => {
+      const value = event.currentTarget?.dataset?.flexConfirm || "cancel";
+      dialog.close(value);
+    };
+
+    const onCancel = () => {
+      dialog.close("cancel");
+    };
+
+    const onClose = () => {
+      finish(dialog.returnValue === "confirm");
+    };
+
+    buttons.forEach((button) => button.addEventListener("click", onClick));
+    dialog.addEventListener("cancel", onCancel);
+    dialog.addEventListener("close", onClose);
+    dialog.showModal();
+  });
+}
+
+function confirmDeleteHistoryItem(isFlexLocked) {
   if (!(typeof HTMLDialogElement !== "undefined" && els.deleteHistoryDialog instanceof HTMLDialogElement)) {
-    return Promise.resolve(window.confirm("履歴画像を削除しますか？\nFlex送信は画像タップでこのページを開ける送信方法です。削除すると、送信済みのFlexメッセージが無効になることがあります。"));
+    const warning = isFlexLocked
+      ? "履歴画像を削除しますか？\nこの画像はFlex送信済みです。削除すると元に戻せず、送信済みのFlexメッセージの画像も表示・再生できなくなります(タップしてもこのページを開けなくなります)。"
+      : "履歴画像を削除しますか？\n削除すると元に戻せません。";
+    return Promise.resolve(window.confirm(warning));
+  }
+
+  if (els.deleteFlexWarning) {
+    els.deleteFlexWarning.hidden = !isFlexLocked;
   }
 
   return new Promise((resolve) => {
@@ -1569,7 +1630,16 @@ async function sendToLine() {
     const isFlex = mode === "flex";
     // LINEの通常画像メッセージはanimatedプロパティを持たないため、Flex以外ではアニメーションが再生されない。
     const isAnimated = isFlex && els.motionPreset.value !== "none";
-    setStatus(`Google Drive へ保存しています。${isFlex ? "Flex送信した画像は履歴に残り、あとから削除できません。" : ""}`, "info");
+
+    if (isFlex) {
+      const confirmed = await confirmFlexSend(buildExportCanvas().toDataURL("image/png"), isAnimated);
+      if (!confirmed) {
+        setStatus("送信はキャンセルされました。", "warn");
+        return;
+      }
+    }
+
+    setStatus(`保存しています。${isFlex ? "Flex送信した画像は履歴に残ります(削除すると送信済みメッセージも見れなくなります)。" : ""}`, "info");
 
     const blob = isAnimated ? await buildAnimationBlob() : await canvasToBlob(buildExportCanvas());
     const upload = await uploadToGasWithOptions(blob, {
@@ -1609,6 +1679,30 @@ async function sendToLine() {
   }
 }
 
+function buildFlexBodyNotes(isAnimated, sourceText) {
+  if (!isAnimated) return [];
+  const notes = [];
+  if (els.flexIncludeTextNote?.checked !== false) {
+    notes.push({
+      type: "text",
+      text: `「${sourceText || "(未入力)"}」を動く画像で送信しました。`,
+      size: "xxs",
+      color: "#999999",
+      wrap: true,
+    });
+  }
+  if (els.flexIncludeCaveatNote?.checked !== false) {
+    notes.push({
+      type: "text",
+      text: "※ご利用端末によっては、動く画像が取得されない場合があります。",
+      size: "xxs",
+      color: "#999999",
+      wrap: true,
+    });
+  }
+  return notes;
+}
+
 function buildFlexImageMessage(upload) {
   const isAnimated = Boolean(upload.animated);
   const flexImageUrl = isAnimated
@@ -1616,6 +1710,7 @@ function buildFlexImageMessage(upload) {
     : (upload.previewImageUrl || upload.originalContentUrl);
   const aspectRatio = buildAspectRatio(upload.width || canvas.width, upload.height || canvas.height);
   const sourceText = (upload.text ?? els.text.value ?? "").replace(/\r?\n/g, " ").trim();
+  const bodyNotes = buildFlexBodyNotes(isAnimated, sourceText);
   return {
     type: "flex",
     altText: `${sourceText || "画像"} - 💬TextIconSender`,
@@ -1639,25 +1734,8 @@ function buildFlexImageMessage(upload) {
       body: {
         type: "box",
         layout: "vertical",
-        contents: isAnimated
-          ? [
-              {
-                type: "text",
-              text: `「${sourceText || "(未入力)"}」を動く画像で送信しました。`,
-                size: "xxs",
-                color: "#999999",
-                wrap: true,
-              },
-              {
-                type: "text",
-                text: "※ご利用端末によっては、動く画像が取得されない場合があります。",
-                size: "xxs",
-                color: "#999999",
-                wrap: true,
-              },
-            ]
-          : [],
-        paddingAll: isAnimated ? "12px" : "0px",
+        contents: bodyNotes,
+        paddingAll: bodyNotes.length ? "12px" : "0px",
         spacing: "none",
         backgroundColor: "#00000000",
       },
@@ -1686,6 +1764,15 @@ async function sendHistoryItem(item) {
       return;
     }
     const isFlex = mode === "flex";
+
+    if (isFlex) {
+      const confirmed = await confirmFlexSend(item.previewImageUrl || item.originalContentUrl, Boolean(item.animated));
+      if (!confirmed) {
+        setStatus("送信はキャンセルされました。", "warn");
+        return;
+      }
+    }
+
     const message = isFlex
       ? buildFlexImageMessage(item)
       : {
@@ -1724,7 +1811,7 @@ async function saveToDriveTest() {
 
   try {
     setSaveTestDisabled(true);
-    setStatus("Google Drive への保存テストを実行しています。", "info");
+    setStatus("保存テストを実行しています。", "info");
 
     const isAnimated = els.motionPreset.value !== "none";
     const blob = isAnimated ? await buildAnimationBlob() : await canvasToBlob(buildExportCanvas());
