@@ -235,7 +235,9 @@ function getFont(size) {
 }
 
 function fitFontSize(lines, maxWidth, maxHeight, strokeWidth) {
-  let size = Number(els.fontSize.value);
+  const lineCount = Math.max(lines.length, 1);
+  const heightBound = Math.floor((maxHeight - strokeWidth * 2) / (lineCount * 1.15));
+  let size = Math.max(12, Math.min(heightBound, CANVAS_SIZE_MAX));
   for (; size >= 12; size -= 1) {
     ctx.font = getFont(size);
     const widths = lines.map((line) => {
