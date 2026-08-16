@@ -690,12 +690,19 @@ function clearTextDraft() {
 
 function updateTextCounter() {
   if (!textCounterEl) return;
-  const count = splitGraphemes(els.text.value || "").length;
-  const isWarn = count > TEXT_WARN_THRESHOLD;
+  // generate() は改行ごとに行を分け、最長行の幅を基準にフォントサイズを決める
+  // （fitFontSize）ため、読みやすさを左右するのは合計文字数ではなく1行の文字数。
+  const lines = (els.text.value || "").split("\n");
+  const lineLengths = lines.map((line) => splitGraphemes(line).length);
+  const maxLineLength = Math.max(0, ...lineLengths);
+  const isWarn = maxLineLength > TEXT_WARN_THRESHOLD;
   textCounterEl.classList.toggle("is-warn", isWarn);
+  const label = lines.length > 1
+    ? `最長行 ${maxLineLength}文字（${lines.length}行）`
+    : `${maxLineLength}文字`;
   textCounterEl.textContent = isWarn
-    ? `${count}文字（文字が多いと小さくなり読みにくくなることがあります）`
-    : `${count}文字`;
+    ? `${label}（文字が多いと小さくなり読みにくくなることがあります）`
+    : label;
 }
 
 function applyStoredColor(input, colorValue) {
