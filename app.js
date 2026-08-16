@@ -1666,9 +1666,14 @@ async function sendToLine() {
     // LINEの通常画像メッセージはanimatedプロパティを持たないため、Flex以外ではアニメーションが再生されない。
     const isAnimated = isFlex && els.motionPreset.value !== "none";
 
+    let blob = null;
     if (isFlex) {
+      setStatus("プレビューを準備しています。", "info");
+      blob = isAnimated ? await buildAnimationBlob() : await canvasToBlob(buildExportCanvas());
+      const previewObjectUrl = URL.createObjectURL(blob);
       const confirmSourceText = (els.text.value || "").replace(/\r?\n/g, " ").trim();
-      const confirmed = await confirmFlexSend(buildExportCanvas().toDataURL("image/png"), isAnimated, confirmSourceText);
+      const confirmed = await confirmFlexSend(previewObjectUrl, isAnimated, confirmSourceText);
+      URL.revokeObjectURL(previewObjectUrl);
       if (!confirmed) {
         setStatus("送信はキャンセルされました。", "warn");
         return;
@@ -1677,7 +1682,9 @@ async function sendToLine() {
 
     setStatus(`保存しています。${isFlex ? "Flex送信した画像は履歴に残ります(削除すると送信済みメッセージも見れなくなります)。" : ""}`, "info");
 
-    const blob = isAnimated ? await buildAnimationBlob() : await canvasToBlob(buildExportCanvas());
+    if (!blob) {
+      blob = await canvasToBlob(buildExportCanvas());
+    }
     const upload = await uploadToGasWithOptions(blob, {
       keepHistory: isFlex ? true : state.historyEnabled,
       animated: isAnimated,
@@ -1808,7 +1815,11 @@ async function sendHistoryItem(item) {
 
     if (isFlex) {
       const confirmSourceText = (item.text || els.text.value || "").replace(/\r?\n/g, " ").trim();
-      const confirmed = await confirmFlexSend(item.previewImageUrl || item.originalContentUrl, Boolean(item.animated), confirmSourceText);
+      const isItemAnimated = Boolean(item.animated);
+      const previewSrc = isItemAnimated
+        ? (item.originalContentUrl || item.previewImageUrl)
+        : (item.previewImageUrl || item.originalContentUrl);
+      const confirmed = await confirmFlexSend(previewSrc, isItemAnimated, confirmSourceText);
       if (!confirmed) {
         setStatus("送信はキャンセルされました。", "warn");
         return;
