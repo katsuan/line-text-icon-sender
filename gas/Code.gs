@@ -13,7 +13,7 @@ function doGet(e) {
       const driveFolderId = getRequiredScriptProperty_(DRIVE_FOLDER_ID_KEY);
       const rootFolder = DriveApp.getFolderById(driveFolderId);
       const userKey = sanitizeDriveName_(params.userKey || 'local_debug');
-      const limit = Math.max(1, Math.min(Number(params.limit || 12), 30));
+      const limit = Math.max(1, Math.min(Number(params.limit || 12), 60));
       const userFolder = getOrCreateChildFolder_(rootFolder, userKey);
       cleanupNoHistoryFolder_(userFolder);
       return jsonResponse({

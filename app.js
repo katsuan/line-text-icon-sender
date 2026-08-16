@@ -18,7 +18,12 @@ const STORAGE_KEYS = {
   historyCollapsed: "texticon_sender_history_collapsed",
   styleCollapsed: "texticon_sender_style_collapsed",
   styleSettings: "texticon_sender_style_settings",
+  textDraft: "texticon_sender_text_draft",
 };
+
+const TEXT_WARN_THRESHOLD = 24;
+const HISTORY_PAGE_SIZE = 12;
+const HISTORY_LIMIT_MAX = 60;
 
 const els = {
   text: document.getElementById("text"),
@@ -79,6 +84,8 @@ const styleTabs = Array.from(document.querySelectorAll(".style-tab"));
 const stylePanels = Array.from(document.querySelectorAll(".style-panel"));
 const previewTabs = Array.from(document.querySelectorAll(".preview-tab"));
 const previewPanels = Array.from(document.querySelectorAll(".preview-mobile-panel"));
+const textCounterEl = document.getElementById("textCounter");
+const loadMoreHistoryButton = document.getElementById("loadMoreHistory");
 const segmenter = typeof Intl !== "undefined" && Intl.Segmenter
   ? new Intl.Segmenter("ja", { granularity: "grapheme" })
   : null;
@@ -90,6 +97,9 @@ const state = {
   historyItems: [],
   historyLoaded: false,
   historyDirty: true,
+  historyLimit: HISTORY_PAGE_SIZE,
+  historyHasMore: false,
+  textDirty: false,
   sections: {
     historyCollapsed: false,
     styleCollapsed: false,
@@ -641,6 +651,53 @@ function loadStyleSettings() {
   }
 }
 
+function debounce(fn, delayMs) {
+  let timerId = null;
+  return (...args) => {
+    if (timerId) window.clearTimeout(timerId);
+    timerId = window.setTimeout(() => fn(...args), delayMs);
+  };
+}
+
+function saveTextDraft(value) {
+  try {
+    if (value) {
+      window.localStorage.setItem(STORAGE_KEYS.textDraft, value);
+    } else {
+      window.localStorage.removeItem(STORAGE_KEYS.textDraft);
+    }
+  } catch (_) {
+    // ignore storage errors
+  }
+}
+
+function loadTextDraft() {
+  try {
+    return window.localStorage.getItem(STORAGE_KEYS.textDraft) || "";
+  } catch (_) {
+    return "";
+  }
+}
+
+function clearTextDraft() {
+  try {
+    window.localStorage.removeItem(STORAGE_KEYS.textDraft);
+  } catch (_) {
+    // ignore storage errors
+  }
+  state.textDirty = false;
+}
+
+function updateTextCounter() {
+  if (!textCounterEl) return;
+  const count = splitGraphemes(els.text.value || "").length;
+  const isWarn = count > TEXT_WARN_THRESHOLD;
+  textCounterEl.classList.toggle("is-warn", isWarn);
+  textCounterEl.textContent = isWarn
+    ? `${count}文字（文字が多いと小さくなり読みにくくなることがあります）`
+    : `${count}文字`;
+}
+
 function applyStoredColor(input, colorValue) {
   if (!colorValue) return;
   input.dataset.colorValue = colorValue;
@@ -854,8 +911,15 @@ function renderHistoryLoading() {
   els.historyList.innerHTML = '<p class="sender-help loading-note">履歴を読み込んでいます。</p>';
 }
 
+function updateLoadMoreButton(items) {
+  if (!loadMoreHistoryButton) return;
+  state.historyHasMore = items.length >= state.historyLimit && state.historyLimit < HISTORY_LIMIT_MAX;
+  loadMoreHistoryButton.hidden = !state.historyHasMore;
+}
+
 function renderHistoryList(items) {
   state.historyItems = items;
+  updateLoadMoreButton(items);
   if (!items.length) {
     els.historyList.innerHTML = '<p class="sender-help">履歴がまだありません。</p>';
     return;
@@ -903,11 +967,16 @@ function renderHistoryList(items) {
   });
 
   els.historyList.querySelectorAll("[data-history-send]").forEach((button) => {
-    button.addEventListener("click", () => {
+    button.addEventListener("click", async () => {
       const index = Number(button.dataset.historySend);
       const item = state.historyItems[index];
       if (!item) return;
-      void sendHistoryItem(item);
+      button.disabled = true;
+      try {
+        await sendHistoryItem(item);
+      } finally {
+        button.disabled = !state.liffReady;
+      }
     });
   });
 
@@ -1556,7 +1625,7 @@ async function fetchHistory() {
   const url = new URL(config.gasWebAppUrl);
   url.searchParams.set("action", "history");
   url.searchParams.set("userKey", getEffectiveUserKey());
-  url.searchParams.set("limit", "12");
+  url.searchParams.set("limit", String(state.historyLimit));
 
   const response = await fetch(url.toString(), {
     method: "GET",
@@ -1672,6 +1741,7 @@ async function sendToLine() {
         await markFlexHistoryItem(upload.fileId);
       }
       setStatus(`${isFlex ? "Flex送信" : "画像送信"}できました。${upload.folderName} に${upload.reused ? "再利用" : "保存"}済みです。`, "success");
+      clearTextDraft();
     } else {
       setStatus(`${isFlex ? "Flex送信" : "画像送信"}はキャンセルされました。画像は ${upload.folderName} に${upload.reused ? "再利用" : "保存"}されています。`, "warn");
     }
@@ -1861,6 +1931,19 @@ Object.values(els).forEach((el) => {
   });
 });
 
+const debouncedSaveTextDraft = debounce((value) => saveTextDraft(value), 400);
+els.text.addEventListener("input", () => {
+  state.textDirty = true;
+  debouncedSaveTextDraft(els.text.value);
+  updateTextCounter();
+});
+
+window.addEventListener("beforeunload", (event) => {
+  if (!state.textDirty) return;
+  event.preventDefault();
+  event.returnValue = "";
+});
+
 alignButtons.forEach((button) => {
   button.addEventListener("click", () => {
     els.align.value = button.dataset.align;
@@ -1933,6 +2016,17 @@ els.refreshHistory.addEventListener("click", () => {
   renderHistoryLoading();
   void refreshHistory();
 });
+if (loadMoreHistoryButton) {
+  loadMoreHistoryButton.addEventListener("click", async () => {
+    state.historyLimit = Math.min(state.historyLimit + HISTORY_PAGE_SIZE, HISTORY_LIMIT_MAX);
+    loadMoreHistoryButton.disabled = true;
+    try {
+      await refreshHistory();
+    } finally {
+      loadMoreHistoryButton.disabled = false;
+    }
+  });
+}
 const restoredStyleSettings = applyStyleSettings(loadStyleSettings());
 if (!restoredStyleSettings) {
   [
@@ -1946,6 +2040,12 @@ if (!restoredStyleSettings) {
     }
   });
 }
+const restoredTextDraft = loadTextDraft();
+if (restoredTextDraft && restoredTextDraft !== els.text.value) {
+  els.text.value = restoredTextDraft;
+  state.textDirty = true;
+}
+updateTextCounter();
 syncOutputs();
 generate();
 applyLocalModeVisibility();

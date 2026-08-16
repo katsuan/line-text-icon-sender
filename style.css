@@ -1166,6 +1166,22 @@ canvas {
   line-height: 1.6;
 }
 
+.text-counter {
+  margin-top: -4px;
+  text-align: right;
+  font-size: 0.82rem;
+}
+
+.text-counter.is-warn {
+  color: #cc9a41;
+  font-weight: 700;
+}
+
+.history-load-more {
+  margin-top: 10px;
+  width: 100%;
+}
+
 .loading-note {
   display: inline-flex;
   align-items: center;
