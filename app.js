@@ -17,7 +17,6 @@ const debugMode = new URLSearchParams(location.search).get("debug") === "1";
 const STORAGE_KEYS = {
   historyCollapsed: "texticon_sender_history_collapsed",
   styleCollapsed: "texticon_sender_style_collapsed",
-  historyEnabled: "texticon_sender_history_enabled",
   styleSettings: "texticon_sender_style_settings",
 };
 
@@ -58,7 +57,6 @@ const els = {
   deleteHistoryDialog: document.getElementById("deleteHistoryDialog"),
   deleteFlexWarning: document.getElementById("deleteFlexWarning"),
   refreshHistory: document.getElementById("refreshHistory"),
-  historyEnabled: document.getElementById("historyEnabled"),
   historyList: document.getElementById("historyList"),
   historySection: document.getElementById("historySection"),
   historyBody: document.getElementById("historyBody"),
@@ -92,7 +90,6 @@ const state = {
   historyItems: [],
   historyLoaded: false,
   historyDirty: true,
-  historyEnabled: true,
   sections: {
     historyCollapsed: false,
     styleCollapsed: false,
@@ -585,29 +582,6 @@ function setSaveTestDisabled(disabled) {
   els.saveTest.disabled = disabled;
 }
 
-function setHistoryEnabled(enabled, options = {}) {
-  const { persist = true } = options;
-  state.historyEnabled = enabled;
-  if (els.historyEnabled) {
-    els.historyEnabled.checked = enabled;
-  }
-  if (persist) {
-    saveStoredBoolean(STORAGE_KEYS.historyEnabled, enabled);
-  }
-  if (!enabled) {
-    state.historyLoaded = false;
-    state.historyDirty = false;
-    els.refreshHistory.disabled = true;
-    renderHistoryDisabled();
-    return;
-  }
-  els.refreshHistory.disabled = !hasGasConfig();
-  state.historyDirty = true;
-  if (!state.sections.historyCollapsed) {
-    void ensureHistoryLoadedIfNeeded(true);
-  }
-}
-
 function loadStoredBoolean(key, fallback = false) {
   try {
     const value = window.localStorage.getItem(key);
@@ -750,7 +724,7 @@ function updateToggleButton(button, collapsed) {
 }
 
 async function ensureHistoryLoadedIfNeeded(force = false) {
-  if (!hasGasConfig() || state.sections.historyCollapsed || !state.historyEnabled) return;
+  if (!hasGasConfig() || state.sections.historyCollapsed) return;
   if (!force && state.historyLoaded && !state.historyDirty) return;
   renderHistoryLoading();
   await refreshHistory();
@@ -801,10 +775,13 @@ function setSectionCollapsed(name, collapsed, options = {}) {
 function initializeSectionState() {
   state.sections.historyCollapsed = loadStoredBoolean(STORAGE_KEYS.historyCollapsed, true);
   state.sections.styleCollapsed = loadStoredBoolean(STORAGE_KEYS.styleCollapsed, false);
-  state.historyEnabled = loadStoredBoolean(STORAGE_KEYS.historyEnabled, true);
   setSectionCollapsed("history", state.sections.historyCollapsed, { persist: false, skipLoad: true });
   setSectionCollapsed("style", state.sections.styleCollapsed, { persist: false });
-  setHistoryEnabled(state.historyEnabled, { persist: false });
+  els.refreshHistory.disabled = !hasGasConfig();
+  state.historyDirty = true;
+  if (!state.sections.historyCollapsed) {
+    void ensureHistoryLoadedIfNeeded(true);
+  }
 }
 
 function applyLocalModeVisibility() {
@@ -875,10 +852,6 @@ function escapeHtml(value) {
 
 function renderHistoryLoading() {
   els.historyList.innerHTML = '<p class="sender-help loading-note">履歴を読み込んでいます。</p>';
-}
-
-function renderHistoryDisabled() {
-  els.historyList.innerHTML = '<p class="sender-help">履歴保存はオフです。新しい画像は一覧に残しません。</p>';
 }
 
 function renderHistoryList(items) {
@@ -1494,7 +1467,7 @@ async function uploadToGasWithOptions(blob, options = {}) {
     text: els.text.value || "",
     userKey: getEffectiveUserKey(),
     assetKey: buildAssetKey(),
-    keepHistory: options.keepHistory ?? state.historyEnabled,
+    keepHistory: true,
     width: canvas.width,
     height: canvas.height,
     animated: Boolean(options.animated),
@@ -1576,9 +1549,6 @@ async function deleteHistoryItem(item) {
 }
 
 async function fetchHistory() {
-  if (!state.historyEnabled) {
-    return [];
-  }
   if (!hasGasConfig()) {
     throw new Error("`config.js` の `gasWebAppUrl` が未設定です。");
   }
@@ -1605,10 +1575,6 @@ async function fetchHistory() {
 }
 
 async function refreshHistory() {
-  if (!state.historyEnabled) {
-    renderHistoryDisabled();
-    return;
-  }
   if (!hasGasConfig()) {
     setStatus("`config.js` の `gasWebAppUrl` が未設定です。", "warn");
     return;
@@ -1631,7 +1597,7 @@ async function refreshHistory() {
 }
 
 function refreshHistorySilently() {
-  if (!hasGasConfig() || !state.historyEnabled) return;
+  if (!hasGasConfig()) return;
   state.historyDirty = true;
   if (state.sections.historyCollapsed) return;
   void fetchHistory()
@@ -1686,7 +1652,6 @@ async function sendToLine() {
       blob = await canvasToBlob(buildExportCanvas());
     }
     const upload = await uploadToGasWithOptions(blob, {
-      keepHistory: isFlex ? true : state.historyEnabled,
       animated: isAnimated,
     });
     const message = isFlex
@@ -1710,9 +1675,7 @@ async function sendToLine() {
     } else {
       setStatus(`${isFlex ? "Flex送信" : "画像送信"}はキャンセルされました。画像は ${upload.folderName} に${upload.reused ? "再利用" : "保存"}されています。`, "warn");
     }
-    if (state.historyEnabled) {
-      refreshHistorySilently();
-    }
+    refreshHistorySilently();
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     setStatus(`送信に失敗しました: ${message}`, "error");
@@ -1970,10 +1933,6 @@ els.refreshHistory.addEventListener("click", () => {
   renderHistoryLoading();
   void refreshHistory();
 });
-els.historyEnabled.addEventListener("change", () => {
-  setHistoryEnabled(els.historyEnabled.checked);
-});
-
 const restoredStyleSettings = applyStyleSettings(loadStyleSettings());
 if (!restoredStyleSettings) {
   [
@@ -1993,7 +1952,6 @@ applyLocalModeVisibility();
 initializeSectionState();
 setSendDisabled(true);
 setSaveTestDisabled(!hasGasConfig());
-els.refreshHistory.disabled = !hasGasConfig() || !state.historyEnabled;
 setStatus("`config.js` を確認しながら初期化しています。", "info");
 activateStyleTab("color");
 activatePreviewTab("transparent");
